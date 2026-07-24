@@ -279,6 +279,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     }
   };
 
+  const handleDownloadPdf = () => {
+    window.print();
+  };
+
   const hasMembers = calculatedData.memberCalculations.length > 0;
 
   return (
@@ -476,9 +480,9 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 </p>
               </div>
             </div>
-            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200 text-center">
-              <p className="text-xs font-semibold text-indigo-600">想定粗利（{selectedReturnRate * 100}%還元時）</p>
-              <p className="font-display text-2xl font-extrabold mt-1.5 text-indigo-700 tabular-nums">
+            <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100 text-center">
+              <p className="text-xs font-semibold text-green-800">想定粗利（{selectedReturnRate * 100}%還元時）</p>
+              <p className="font-display text-2xl font-extrabold mt-1.5 text-green-600 tabular-nums">
                 {formatCurrency(calculatedData.selectedGrossProfit)}
               </p>
             </div>
@@ -834,9 +838,19 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       )}
 
       {/* フッター */}
-      <footer className="border-t border-slate-100 pt-6 text-center">
-        <p className="text-sm font-semibold text-slate-600">レポート作成完了</p>
-        <p className="text-xs text-slate-400 mt-1">このレポートはエクセルデータの自動集計・診断ルールに基づいて作成されています。</p>
+      <footer className="border-t border-slate-100 pt-6 text-center print:hidden">
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 3v12" />
+            <path d="M7 10l5 5 5-5" />
+            <path d="M5 21h14" />
+          </svg>
+          PDFをダウンロード
+        </button>
       </footer>
     </div>
   );
