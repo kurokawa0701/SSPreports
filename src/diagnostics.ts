@@ -111,11 +111,11 @@ export function buildAutoHeadline(totals: OverallTotals): string {
 export function toneBadgeClasses(tone: DiagnosisToneLike): string {
   switch (tone) {
     case 'success':
-      return 'bg-green-100 text-green-900 border border-green-200';
+      return 'bg-green-50 text-green-800 border border-green-200';
     case 'warning':
-      return 'bg-orange-100 text-orange-900 border border-orange-200';
+      return 'bg-amber-50 text-amber-800 border border-amber-200';
     case 'info':
-      return 'bg-blue-100 text-blue-900 border border-blue-200';
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
     default:
       return 'bg-slate-100 text-slate-600 border border-slate-200';
   }
@@ -127,9 +127,9 @@ export function toneCardClasses(tone: DiagnosisToneLike): string {
     case 'success':
       return 'bg-green-50 border border-green-200 border-l-4 border-l-green-500 text-green-900';
     case 'warning':
-      return 'bg-orange-50 border border-orange-200 border-l-4 border-l-orange-500 text-orange-900';
+      return 'bg-amber-50 border border-amber-200 border-l-4 border-l-amber-500 text-amber-900';
     case 'info':
-      return 'bg-blue-50 border border-blue-200 border-l-4 border-l-blue-500 text-blue-900';
+      return 'bg-indigo-50 border border-indigo-200 border-l-4 border-l-indigo-500 text-indigo-900';
     default:
       return 'bg-slate-50 border border-slate-200 border-l-4 border-l-slate-400 text-slate-700';
   }
@@ -197,4 +197,14 @@ export function groupDiagnoses(
   }
 
   return order.map((key) => groups.get(key)!);
+}
+
+/** 「全体診断（コピペ用）」セクションの中身を、クリップボードコピー用のプレーンテキストに整形する */
+export function buildDiagnosisCopyText(groups: DiagnosisGroup[]): string {
+  return groups
+    .map((group) => {
+      const lines = group.entries.map((entry) => `【${entry.name}】：${entry.comment}`);
+      return [`【${group.label}】`, ...lines].join('\n');
+    })
+    .join('\n\n');
 }

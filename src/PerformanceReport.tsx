@@ -13,6 +13,7 @@ import {
   OFFER_RATE_GOOD_THRESHOLD,
   buildActionPlan,
   buildAutoHeadline,
+  buildDiagnosisCopyText,
   diagnoseMember,
   evaluateAbove,
   groupDiagnoses,
@@ -79,7 +80,9 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [pendingSheets, setPendingSheets] = useState<Extract<PreparedImport, { kind: 'excel-multi' }> | null>(null);
+  const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- 自動計算ロジック ---
   const calculatedData = useMemo(() => {
@@ -131,6 +134,13 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     );
     const offerEvaluation = evaluateAbove(offerRate, OFFER_RATE_GOOD_THRESHOLD, '良好な水準', '重要課題');
 
+    // 選択中の還元率における想定粗利（全体実績カードのKPI用）
+    const selectedGrossProfit = totalUnitPrices * (1 - selectedReturnRate);
+
+    // ファネルのバー幅（提案数を100%とした割合）
+    const interviewBarWidth = totalProposals > 0 ? Math.min(100, (totalInterviews / totalProposals) * 100) : 0;
+    const offerBarWidth = totalProposals > 0 ? Math.min(100, (totalOffers / totalProposals) * 100) : 0;
+
     return {
       totalUnitPrices,
       totalOffers,
@@ -144,6 +154,9 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       offerRate,
       interviewEvaluation,
       offerEvaluation,
+      selectedGrossProfit,
+      interviewBarWidth,
+      offerBarWidth,
     };
   }, [data.members, selectedReturnRate]);
 
@@ -249,6 +262,23 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     setImportErrors([]);
   };
 
+  const handleCopyDiagnosis = async () => {
+    const text = buildDiagnosisCopyText(calculatedData.diagnosisGroups);
+    const showCopied = () => {
+      setCopied(true);
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+      copyResetTimer.current = setTimeout(() => setCopied(false), 1800);
+    };
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      }
+      showCopied();
+    } catch {
+      showCopied();
+    }
+  };
+
   const hasMembers = calculatedData.memberCalculations.length > 0;
 
   return (
@@ -286,7 +316,11 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
             <button
               type="button"
               onClick={() => setIsEditing((v) => !v)}
-              className="px-3 py-1.5 text-sm font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg border transition-colors ${
+                isEditing
+                  ? 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-500'
+                  : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
             >
               {isEditing ? '編集を終える' : 'データを編集'}
             </button>
@@ -308,30 +342,37 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           <p className="text-xs text-slate-400">作成日: {new Date().toLocaleDateString('ja-JP')}</p>
         </div>
 
-        <div className="mt-6 p-4 rounded-xl bg-orange-50/50 border border-orange-100">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-orange-900 font-bold">要約：</span>
-            {isEditing && data.headline.trim() && (
-              <button
-                type="button"
-                onClick={() => updateHeaderField({ headline: '' })}
-                className="text-xs font-semibold text-orange-700 hover:text-orange-900 underline print:hidden"
-              >
-                自動生成に戻す
-              </button>
+        <div className="mt-6 p-5 rounded-2xl bg-white border border-slate-100 shadow-sm flex gap-4 items-start">
+          <span className="shrink-0 w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3l1.9 4.9L19 9.8l-4.1 3 1.5 5L12 15l-4.4 2.8 1.5-5L5 9.8l5.1-1.9z" />
+            </svg>
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-indigo-600 tracking-wide">サマリー</span>
+              {isEditing && data.headline.trim() && (
+                <button
+                  type="button"
+                  onClick={() => updateHeaderField({ headline: '' })}
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline print:hidden"
+                >
+                  自動生成に戻す
+                </button>
+              )}
+            </div>
+            {isEditing ? (
+              <textarea
+                className="mt-2 block w-full rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 text-sm leading-relaxed text-slate-900"
+                rows={3}
+                placeholder={autoHeadline}
+                value={data.headline}
+                onChange={(e) => updateHeaderField({ headline: e.target.value })}
+              />
+            ) : (
+              <p className="text-slate-900 leading-relaxed font-medium mt-1">{displayedHeadline}</p>
             )}
           </div>
-          {isEditing ? (
-            <textarea
-              className="mt-2 block w-full rounded-lg border border-orange-200 bg-white/70 p-2 text-sm leading-relaxed text-orange-900"
-              rows={3}
-              placeholder={autoHeadline}
-              value={data.headline}
-              onChange={(e) => updateHeaderField({ headline: e.target.value })}
-            />
-          ) : (
-            <p className="text-orange-900 leading-relaxed font-medium mt-1">{displayedHeadline}</p>
-          )}
         </div>
 
         {isEditing && (
@@ -411,29 +452,35 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         {/* 全体実績 */}
         <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-4">全体実績</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-[1.3fr,1fr] gap-4">
-            <div className="p-5 bg-green-50 rounded-xl border border-green-100 flex flex-col items-center justify-center text-center">
+          <div className="flex flex-col gap-3.5">
+            <div className="p-5 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100 text-center">
               <p className="text-sm font-semibold text-green-800">売上獲得金額（合計単価）</p>
-              <p className="text-3xl font-extrabold mt-1 text-green-900 break-all">
+              <p className="font-display text-4xl font-extrabold mt-1 text-green-600 tabular-nums break-all">
                 {formatCurrency(calculatedData.totalUnitPrices)}
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-3">
-              <div className="p-3 bg-white rounded-xl border border-slate-200 text-center">
-                <p className="text-xs font-semibold text-slate-500">稼働要員数</p>
-                <p className="text-xl font-extrabold mt-1">
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="p-4 bg-white rounded-xl border border-slate-200 text-center">
+                <p className="text-xs text-slate-500">稼働要員数</p>
+                <p className="font-display text-2xl font-extrabold mt-1.5 tabular-nums">
                   {data.members.length}
-                  <span className="text-xs font-normal text-slate-400">名</span>
+                  <span className="text-xs font-semibold text-slate-500 ml-0.5">名</span>
                 </p>
               </div>
-              <div className="p-3 bg-white rounded-xl border border-slate-200 text-center">
-                <p className="text-xs font-semibold text-slate-500">要員平均単価</p>
-                <p className="text-xl font-extrabold mt-1">
+              <div className="p-4 bg-white rounded-xl border border-slate-200 text-center">
+                <p className="text-xs text-slate-500">要員平均単価</p>
+                <p className="font-display text-2xl font-extrabold mt-1.5 tabular-nums">
                   {formatCurrency(
                     data.members.length > 0 ? Math.round(calculatedData.totalUnitPrices / data.members.length) : 0
                   )}
                 </p>
               </div>
+            </div>
+            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200 text-center">
+              <p className="text-xs font-semibold text-indigo-600">想定粗利（{selectedReturnRate * 100}%還元時）</p>
+              <p className="font-display text-2xl font-extrabold mt-1.5 text-indigo-700 tabular-nums">
+                {formatCurrency(calculatedData.selectedGrossProfit)}
+              </p>
             </div>
           </div>
         </section>
@@ -442,61 +489,78 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:break-inside-avoid flex flex-col">
           <h2 className="text-lg font-bold mb-4">ファネル分析</h2>
           {hasMembers ? (
-            <div className="flex-1 flex flex-col justify-center gap-6">
-              {/* 提案→面談→オファーの推移 */}
-              <div className="flex items-center gap-2">
-                <div className="flex-1 py-5 px-3 rounded-2xl bg-slate-900 text-white text-center">
-                  <p className="text-xs font-semibold text-slate-300">提案</p>
-                  <p className="text-2xl font-extrabold mt-1">
-                    {calculatedData.totalProposals}
-                    <span className="text-sm font-semibold text-slate-300 ml-0.5">件</span>
-                  </p>
+            <div className="flex-1 flex flex-col justify-center">
+              {/* 提案 */}
+              <div className="flex items-center gap-3">
+                <div className="w-14 shrink-0 text-xs font-bold text-slate-600 text-right">提案</div>
+                <div className="flex-1 h-11 bg-slate-100 rounded-xl overflow-hidden">
+                  <div className="h-full rounded-xl bg-gradient-to-r from-slate-700 to-slate-500" style={{ width: '100%' }} />
                 </div>
-                <span className="shrink-0 text-xl text-slate-300" aria-hidden="true">
-                  →
-                </span>
-                <div className="flex-1 py-5 px-3 rounded-2xl bg-slate-700 text-white text-center">
-                  <p className="text-xs font-semibold text-slate-300">面談</p>
-                  <p className="text-2xl font-extrabold mt-1">
-                    {calculatedData.totalInterviews}
-                    <span className="text-sm font-semibold text-slate-300 ml-0.5">件</span>
-                  </p>
-                </div>
-                <span className="shrink-0 text-xl text-slate-300" aria-hidden="true">
-                  →
-                </span>
-                <div className="flex-1 py-5 px-3 rounded-2xl bg-blue-600 text-white text-center">
-                  <p className="text-xs font-semibold text-blue-100">オファー</p>
-                  <p className="text-2xl font-extrabold mt-1">
-                    {calculatedData.totalOffers}
-                    <span className="text-sm font-semibold text-blue-100 ml-0.5">件</span>
-                  </p>
+                <div className="w-16 shrink-0 font-display text-xl font-extrabold tabular-nums">
+                  {calculatedData.totalProposals}
+                  <span className="text-xs font-semibold text-slate-500 ml-0.5">件</span>
                 </div>
               </div>
 
-              {/* 各ステップの転換率 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-white rounded-xl border border-slate-200 text-center">
-                  <p className="text-xs font-semibold text-slate-500">面談移行率</p>
-                  <p className="text-2xl font-extrabold text-blue-700 mt-1">
-                    {calculateRate(calculatedData.totalInterviews, calculatedData.totalProposals)}
-                  </p>
-                  <span
-                    className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${toneBadgeClasses(calculatedData.interviewEvaluation.tone)}`}
-                  >
-                    {calculatedData.interviewEvaluation.label}
-                  </span>
+              {/* 面談移行率コネクタ */}
+              <div className="flex items-center gap-2 py-2 pl-[68px]">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 5v14M6 13l6 6 6-6" />
+                </svg>
+                <span className="text-xs text-slate-500">面談移行率</span>
+                <span className="text-sm font-extrabold text-slate-900 tabular-nums">
+                  {calculateRate(calculatedData.totalInterviews, calculatedData.totalProposals)}
+                </span>
+                <span
+                  className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold ${toneBadgeClasses(calculatedData.interviewEvaluation.tone)}`}
+                >
+                  {calculatedData.interviewEvaluation.label}
+                </span>
+              </div>
+
+              {/* 面談 */}
+              <div className="flex items-center gap-3">
+                <div className="w-14 shrink-0 text-xs font-bold text-slate-600 text-right">面談</div>
+                <div className="flex-1 h-11 bg-slate-100 rounded-xl overflow-hidden">
+                  <div
+                    className="h-full rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500"
+                    style={{ width: `${calculatedData.interviewBarWidth}%` }}
+                  />
                 </div>
-                <div className="p-4 bg-white rounded-xl border border-slate-200 text-center">
-                  <p className="text-xs font-semibold text-slate-500">オファー獲得率</p>
-                  <p className="text-2xl font-extrabold text-blue-700 mt-1">
-                    {calculateRate(calculatedData.totalOffers, calculatedData.totalInterviews)}
-                  </p>
-                  <span
-                    className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${toneBadgeClasses(calculatedData.offerEvaluation.tone)}`}
-                  >
-                    {calculatedData.offerEvaluation.label}
-                  </span>
+                <div className="w-16 shrink-0 font-display text-xl font-extrabold tabular-nums">
+                  {calculatedData.totalInterviews}
+                  <span className="text-xs font-semibold text-slate-500 ml-0.5">件</span>
+                </div>
+              </div>
+
+              {/* オファー獲得率コネクタ */}
+              <div className="flex items-center gap-2 py-2 pl-[68px]">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 5v14M6 13l6 6 6-6" />
+                </svg>
+                <span className="text-xs text-slate-500">オファー獲得率</span>
+                <span className="text-sm font-extrabold text-slate-900 tabular-nums">
+                  {calculateRate(calculatedData.totalOffers, calculatedData.totalInterviews)}
+                </span>
+                <span
+                  className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold ${toneBadgeClasses(calculatedData.offerEvaluation.tone)}`}
+                >
+                  {calculatedData.offerEvaluation.label}
+                </span>
+              </div>
+
+              {/* オファー */}
+              <div className="flex items-center gap-3">
+                <div className="w-14 shrink-0 text-xs font-bold text-amber-600 text-right">オファー</div>
+                <div className="flex-1 h-11 bg-slate-100 rounded-xl overflow-hidden">
+                  <div
+                    className="h-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-400"
+                    style={{ width: `${Math.max(calculatedData.offerBarWidth, calculatedData.totalOffers > 0 ? 6 : 0)}%` }}
+                  />
+                </div>
+                <div className="w-16 shrink-0 font-display text-xl font-extrabold tabular-nums">
+                  {calculatedData.totalOffers}
+                  <span className="text-xs font-semibold text-slate-500 ml-0.5">件</span>
                 </div>
               </div>
             </div>
@@ -509,7 +573,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
 
         {/* 還元率別の想定粗利と対効果 */}
         <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:break-inside-avoid">
-          <h2 className="text-lg font-bold mb-4">還元率別の想定粗利と対効果</h2>
+          <h2 className="text-lg font-bold mb-1">還元率別の想定粗利と対効果</h2>
+          <p className="text-xs text-slate-400 mb-3 print:hidden">行をクリックすると下部の還元率が切り替わります</p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-white text-slate-500 font-medium">
@@ -520,13 +585,26 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {calculatedData.profitData.map((profit) => (
-                  <tr key={profit.returnRate} className="bg-white/60">
-                    <td className="p-3 font-bold text-slate-900">{profit.returnRate}%還元</td>
-                    <td className="p-3 text-right font-semibold">{formatCurrency(profit.grossProfit)}</td>
-                    <td className="p-3 text-right font-bold text-blue-700">{profit.costEffectiveness.toFixed(0)}%</td>
-                  </tr>
-                ))}
+                {calculatedData.profitData.map((profit) => {
+                  const isActive = Math.round(profit.returnRate) === Math.round(selectedReturnRate * 100);
+                  return (
+                    <tr
+                      key={profit.returnRate}
+                      onClick={() => setSelectedReturnRate(profit.returnRate / 100)}
+                      className={`cursor-pointer transition-colors print:cursor-auto ${isActive ? 'bg-indigo-50/60' : 'bg-white/60 hover:bg-slate-50'}`}
+                    >
+                      <td
+                        className={`p-3 border-l-[3px] ${isActive ? 'border-l-indigo-600 font-bold text-slate-900' : 'border-l-transparent font-medium text-slate-700'}`}
+                      >
+                        {profit.returnRate}%還元
+                      </td>
+                      <td className="p-3 text-right font-semibold tabular-nums">{formatCurrency(profit.grossProfit)}</td>
+                      <td className="p-3 text-right font-bold text-indigo-600 tabular-nums">
+                        {profit.costEffectiveness.toFixed(0)}%
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -570,21 +648,27 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       {/* 要員別診断 & ファネル図 */}
       <section className="space-y-8 print:break-inside-avoid">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-bold border-l-4 border-slate-900 pl-3">要員別詳細データ</h2>
-          <label className="flex items-center gap-2 text-sm text-slate-500 print:hidden">
-            還元率
-            <select
-              className="rounded-lg border border-slate-200 px-2 py-1 text-sm font-semibold text-slate-700"
-              value={selectedReturnRate}
-              onChange={(e) => setSelectedReturnRate(Number(e.target.value))}
-            >
-              {RETURN_RATE_OPTIONS.map((opt) => (
-                <option key={opt.returnRate} value={opt.returnRate}>
-                  {opt.rateLabel}
-                </option>
-              ))}
-            </select>
-          </label>
+          <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3">要員別詳細データ</h2>
+          <div className="flex items-center gap-3 print:hidden">
+            <span className="text-sm font-semibold text-slate-500">還元率</span>
+            <div className="inline-flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+              {RETURN_RATE_OPTIONS.map((opt) => {
+                const isActive = Math.round(opt.returnRate * 100) === Math.round(selectedReturnRate * 100);
+                return (
+                  <button
+                    key={opt.returnRate}
+                    type="button"
+                    onClick={() => setSelectedReturnRate(opt.returnRate)}
+                    className={`rounded-xl px-4 py-1.5 text-sm font-bold transition-colors ${
+                      isActive ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'
+                    }`}
+                  >
+                    {opt.returnRate * 100}%
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {!hasMembers ? (
@@ -604,7 +688,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   <th className="p-4 text-center">面談移行率</th>
                   <th className="p-4 text-center">面談社数</th>
                   <th className="p-4 text-center">オファー社数</th>
-                  <th className="p-4 text-right">粗利額</th>
+                  <th className="p-4 text-right">粗利額（{selectedReturnRate * 100}%還元）</th>
                   <th className="p-4 text-center">診断結果</th>
                   {isEditing && <th className="p-4 text-center print:hidden">操作</th>}
                 </tr>
@@ -675,7 +759,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                         m.offers
                       )}
                     </td>
-                    <td className="p-4 text-right font-bold text-slate-600">{formatCurrency(m.grossProfit)}</td>
+                    <td className="p-4 text-right font-bold text-indigo-700 tabular-nums">{formatCurrency(m.grossProfit)}</td>
                     <td className="p-4 text-center">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${toneBadgeClasses(m.diagnosis.tone)}`}>
                         {m.diagnosis.label}
@@ -715,7 +799,20 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       {/* 診断コピペ用まとめ */}
       {hasMembers && (
         <section className="space-y-4 print:break-inside-avoid">
-          <h2 className="text-xl font-bold border-l-4 border-slate-900 pl-3">全体診断（コピペ用）</h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3">全体診断（コピペ用）</h2>
+            <button
+              type="button"
+              onClick={() => void handleCopyDiagnosis()}
+              className={`px-3 py-1.5 text-sm font-bold rounded-lg border transition-colors print:hidden ${
+                copied
+                  ? 'border-green-200 bg-green-50 text-green-700'
+                  : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {copied ? 'コピーしました ✓' : 'テキストをコピー'}
+            </button>
+          </div>
           <div className="p-6 bg-white rounded-2xl border border-slate-100">
             <div className="space-y-3 text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto">
               {calculatedData.diagnosisGroups.map((group) => (

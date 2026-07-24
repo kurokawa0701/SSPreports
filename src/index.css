@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Noto Sans JP', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Noto Sans JP', system-ui, sans-serif;
+}
+
 @media print {
   @page {
     margin: 12mm;
