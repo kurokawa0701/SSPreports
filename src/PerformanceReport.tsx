@@ -343,7 +343,6 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               {data.period}
             </p>
           )}
-          <p className="text-xs text-slate-400">作成日: {new Date().toLocaleDateString('ja-JP')}</p>
         </div>
 
         <div className="mt-6 p-5 rounded-2xl bg-white border border-slate-100 shadow-sm flex gap-4 items-start">
