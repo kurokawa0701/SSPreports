@@ -331,7 +331,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   const hasMembers = calculatedData.memberCalculations.length > 0;
 
   return (
-    <div className="max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none print:max-w-none print:p-0 print:space-y-6">
+    <div className="max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none print:max-w-none print:p-0 print:space-y-4">
       {/* 表紙（PDF/印刷時のみ表示。社外提出を想定した1枚目） */}
       <div className="hidden print:flex print:flex-col print:items-center print:justify-center print:text-center print:min-h-[240mm] print:break-after-page">
         <img
@@ -451,8 +451,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           </div>
         </div>
 
+        {/* データ取り込みパネル。「PDFをダウンロード」からは編集モードを抜けてから印刷するため
+            通常は現れないが、編集中にブラウザのCtrl+Pで直接印刷された場合の保険として印刷対象から外す。 */}
         {isEditing && (
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-3 print:hidden">
             {pendingSheets ? (
               <div className="rounded-xl border border-slate-200 p-4 space-y-3">
                 <p className="text-sm font-semibold text-slate-700">
@@ -524,9 +526,9 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       </header>
 
       {/* サマリー: 2x2クアドラント（印刷時は縦1列にして、A4縦表示でも読みやすくする） */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-1 print:gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-1 print:gap-3">
         {/* 全体実績 */}
-        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
+        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-4">全体実績</h2>
           <div className="flex flex-col gap-3.5">
             <div className="p-5 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100 text-center">
@@ -567,7 +569,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         </section>
 
         {/* ファネル分析 */}
-        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col">
+        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col">
           <h2 className="text-lg font-bold mb-4">ファネル分析</h2>
           {hasMembers ? (
             <div className="flex-1 flex flex-col justify-center">
@@ -653,7 +655,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         </section>
 
         {/* 還元率別の実質粗利と対効果 */}
-        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
+        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-1">還元率別の実質粗利と対効果</h2>
           <p className="text-xs text-slate-400 mb-3 print:hidden">還元率ごとの比較表です（下部の要員別詳細データとは連動しません）</p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -686,14 +688,15 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           </p>
         </section>
 
-        {/* 要員別診断と今後の対策 */}
-        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
-          <h2 className="text-lg font-bold mb-4">要員別診断と今後の対策</h2>
+        {/* 要員別診断と今後の対策。要員数に応じて高さが変わるため、ブロック単位ではなく
+            カード単位で改ページを避ける（ブロック全体をavoidにすると用紙下部が大きく空く） */}
+        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300">
+          <h2 className="text-lg font-bold mb-4 print:break-after-avoid">要員別診断と今後の対策</h2>
           {hasMembers ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 {calculatedData.diagnosisGroups.map((group) => (
-                  <div key={group.label} className={`p-3 rounded-xl ${toneCardClasses(group.tone)}`}>
+                  <div key={group.label} className={`p-3 rounded-xl print:break-inside-avoid ${toneCardClasses(group.tone)}`}>
                     <p className="font-bold text-sm">{group.label}</p>
                     <p className="text-xs mt-1 opacity-80">{group.entries.map((e) => e.name).join('、')}</p>
                   </div>
@@ -721,7 +724,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 ) : (
                   <div className="space-y-3">
                     {displayedActionPlanItems.map((action, idx) => (
-                      <div key={`${idx}-${action}`} className="flex gap-3 p-3 bg-white rounded-xl border border-slate-200">
+                      <div key={`${idx}-${action}`} className="flex gap-3 p-3 bg-white rounded-xl border border-slate-200 print:break-inside-avoid">
                         <span className="shrink-0 w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">
                           {idx + 1}
                         </span>
@@ -741,9 +744,9 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       </div>
 
       {/* 要員別診断 & ファネル図 */}
-      <section className="space-y-8 print:break-before-page">
+      <section className="space-y-8 print:space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3">要員別詳細データ</h2>
+          <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3 print:break-after-avoid">要員別詳細データ</h2>
           <div className="flex items-center gap-3 print:hidden">
             <span className="text-sm font-semibold text-slate-500">還元率</span>
             <div className="inline-flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
@@ -1034,9 +1037,9 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
 
       {/* 診断コピペ用まとめ */}
       {hasMembers && (
-        <section className="space-y-4 print:break-before-page">
+        <section className="space-y-4 print:space-y-2">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3">全体診断（コピペ用）</h2>
+            <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3 print:break-after-avoid">全体診断（コピペ用）</h2>
             <button
               type="button"
               onClick={() => void handleCopyDiagnosis()}
@@ -1049,7 +1052,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               {copied ? 'コピーしました ✓' : 'テキストをコピー'}
             </button>
           </div>
-          <div className="p-6 bg-white rounded-2xl border border-slate-100 space-y-2">
+          <div className="p-6 print:p-0 bg-white rounded-2xl border border-slate-100 print:border-0 space-y-2">
             {isEditing ? (
               <>
                 <textarea
