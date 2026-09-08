@@ -50,6 +50,17 @@ const RETURN_RATE_OPTIONS: ReturnRateOption[] = [
 const COST_EFFECTIVENESS_BASELINE = 350000;
 
 
+/**
+ * 表紙に出す宛名を組み立てる。
+ * Excelの顧客名セルは「顧客名：株式会社◯◯様」のように敬称込みで入力される運用のため、
+ * 一律に「様」を付けると「株式会社◯◯様 様」と二重になる。既に敬称が付いている場合はそのまま使う。
+ */
+function formatClientName(clientName: string): string {
+  const name = clientName.trim();
+  if (!name) return '顧客名未設定 様';
+  return /(様|御中)$/.test(name) ? name : `${name} 様`;
+}
+
 function createEmptyMember(index: number): MemberData {
   return {
     id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `m-${Date.now()}-${index}`,
@@ -351,7 +362,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           className="w-44 h-auto mb-10"
         />
         <p className="text-xs font-bold tracking-[0.3em] text-slate-400 mb-4">SSP（SES）REPORT</p>
-        <h1 className="text-3xl font-extrabold text-slate-900 mb-3">{data.clientName || '顧客名未設定'} 様</h1>
+        <h1 className="text-3xl font-extrabold text-slate-900 mb-3">{formatClientName(data.clientName)}</h1>
         <p className="text-base text-slate-500 mb-12">SSP（SES）レポート</p>
         <div className="text-sm text-slate-500 space-y-2">
           <p>対象期間：{data.period || '未設定'}</p>
