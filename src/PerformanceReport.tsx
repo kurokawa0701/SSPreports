@@ -340,7 +340,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   const hasMembers = calculatedData.memberCalculations.length > 0;
 
   return (
-    <div className="max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none print:max-w-none print:p-0">
+    <div className="max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none print:max-w-none print:p-0 print:space-y-6">
       {/* 表紙（PDF/印刷時のみ表示。社外提出を想定した1枚目） */}
       <div className="hidden print:flex print:flex-col print:items-center print:justify-center print:text-center print:min-h-[240mm] print:break-after-page">
         <span className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-slate-900 text-white text-4xl font-bold mb-8">
@@ -528,8 +528,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         )}
       </header>
 
-      {/* サマリー: 2x2クアドラント */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* サマリー: 2x2クアドラント（印刷時は縦1列にして、A4縦表示でも読みやすくする） */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-1 print:gap-4">
         {/* 全体実績 */}
         <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-4">全体実績</h2>
@@ -777,7 +777,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
             <p className="text-sm mt-1">「データを編集」から要員を追加するか、CSVを読み込んでください。</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-inner">
+          <>
+          <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-inner print:hidden">
             <table className="member-detail-table w-full text-sm">
               <thead className="bg-slate-50 text-slate-600 font-medium">
                 <tr>
@@ -943,6 +944,74 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               </div>
             )}
           </div>
+
+          {/* 印刷用レイアウト（A4縦表示を想定）。画面表示用の横長な表は用紙幅に収まらず読みにくいため、
+              印刷時のみ要員1名ごとのカードを縦に並べる構成に切り替える。 */}
+          <div className="hidden print:block space-y-3">
+            {calculatedData.memberCalculations.map((m, idx) => (
+              <div key={m.id} className="print:break-inside-avoid rounded-xl border border-slate-300 overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-100 border-b border-slate-300">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-slate-400">{String(idx + 1).padStart(2, '0')}</span>
+                    <span className="font-bold text-sm">{m.name}</span>
+                  </div>
+                  <span
+                    className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${toneBadgeClasses(m.diagnosis.tone)}`}
+                  >
+                    {m.diagnosis.label}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 text-center">
+                  <div className="px-2 py-2">
+                    <p className="text-[9px] text-slate-400">単価</p>
+                    <p className="text-xs font-bold tabular-nums">{formatCurrency(m.unitPrice)}</p>
+                  </div>
+                  <div className="px-2 py-2">
+                    <p className="text-[9px] text-slate-400">支援費</p>
+                    <p className="text-xs font-bold tabular-nums">{formatCurrency(m.supportFee)}</p>
+                  </div>
+                  <div className="px-2 py-2 bg-emerald-50">
+                    <p className="text-[9px] text-emerald-700">実質粗利（{selectedReturnRate * 100}%還元）</p>
+                    <p className="text-xs font-extrabold text-emerald-700 tabular-nums">{formatCurrency(m.grossProfit)}</p>
+                  </div>
+                  <div className="px-2 py-2">
+                    <p className="text-[9px] text-slate-400">面談移行率</p>
+                    <p className="text-xs font-bold tabular-nums">{calculateRate(m.interviews, m.proposals)}</p>
+                  </div>
+                </div>
+
+                <div className="px-4 py-2 border-b border-slate-200 text-[11px] text-slate-600 flex items-center gap-3 flex-wrap">
+                  <span>
+                    提案 <b className="tabular-nums">{m.proposals}</b>件
+                  </span>
+                  <span className="text-slate-300">→</span>
+                  <span>
+                    面談 <b className="tabular-nums">{m.interviews}</b>件
+                  </span>
+                  <span className="text-slate-300">→</span>
+                  <span>
+                    オファー <b className="tabular-nums">{m.offers}</b>件
+                  </span>
+                  {m.closeReason && <span className="ml-auto text-slate-400">営業終了理由：{m.closeReason}</span>}
+                </div>
+
+                <div className="px-4 py-3 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 mb-1">診断結果</p>
+                    <p className="text-[11px] leading-relaxed text-slate-600">{m.diagnosis.comment}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 mb-1">今後の対策</p>
+                    <p className="text-[11px] leading-relaxed text-slate-600">
+                      {m.actionNote?.trim() ? m.actionNote : getActionRecommendation(m.diagnosis.label)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
 
       </section>
