@@ -1,8 +1,8 @@
 // csv.ts
 // 要員データをCSV/Excelから取り込むための共通パーサー。
 // 想定フォーマット: 氏名,提案数,面談数,オファー数,単価 (1行目はヘッダーでも可)
-// 6列目に案件母数、7列目に営業終了理由を追加すると、それぞれ任意項目として読み込む
-// （どちらも省略可。列自体が無い/空でもエラーにはならない）。
+// 6列目に案件母数、7列目に営業終了理由、8列目に支援費を追加すると、それぞれ任意項目として読み込む
+// （すべて省略可。列自体が無い/空でもエラーにはならず、支援費は未指定なら0として扱う）。
 // CSVはクォート囲みや埋め込みカンマまでは対応していないシンプルな実装。
 // エクセルからのコピペ等、複雑な引用符を含むデータは事前に整形してから取り込むこと。
 
@@ -71,6 +71,11 @@ export function parseMemberRows(rows: ImportRow[]): CsvImportResult {
     const closeReasonRaw = row[6];
     const closeReason =
       closeReasonRaw !== undefined && String(closeReasonRaw).trim() !== '' ? String(closeReasonRaw).trim() : undefined;
+    const supportFeeRaw = row[7];
+    const supportFee =
+      supportFeeRaw !== undefined && String(supportFeeRaw).trim() !== '' && !Number.isNaN(Number(supportFeeRaw))
+        ? Number(supportFeeRaw)
+        : 0;
 
     members.push({
       id: `${Date.now()}-${i}`,
@@ -79,6 +84,7 @@ export function parseMemberRows(rows: ImportRow[]): CsvImportResult {
       interviews,
       offers,
       unitPrice,
+      supportFee,
       ...(casePoolSize !== undefined ? { casePoolSize } : {}),
       ...(closeReason !== undefined ? { closeReason } : {}),
     });

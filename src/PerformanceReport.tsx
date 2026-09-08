@@ -66,6 +66,7 @@ function createEmptyMember(index: number): MemberData {
     interviews: 0,
     offers: 0,
     unitPrice: 0,
+    supportFee: 0,
   };
 }
 
@@ -91,13 +92,16 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     const totalOffers = data.members.reduce((sum, m) => sum + m.offers, 0);
     const totalInterviews = data.members.reduce((sum, m) => sum + m.interviews, 0);
     const totalProposals = data.members.reduce((sum, m) => sum + m.proposals, 0);
+    const totalSupportFee = data.members.reduce((sum, m) => sum + m.supportFee, 0);
 
-    // 粗利・費用対効果シミュレーション (60%, 70%, 80% 還元の3パターン比較)
-    // 費用対効果 = 粗利 ÷ 固定費用基準額（35万円換算）× 100
+    // 実質粗利・費用対効果シミュレーション (60%, 70%, 80% 還元の3パターン比較)
+    // 実質粗利 = 売上単価の合計 × (1 - 還元率) - 支援費の合計
+    // 費用対効果 = 実質粗利 ÷ 固定費用基準額（35万円換算）× 100
     // ※35万円は元のExcelレポート（SSPレポートテンプレート）の計算方法に合わせた固定の基準値
+    // ※支援費は還元率に関わらず一定のコストのため、どのシナリオでも同額を控除する
     const RETURN_RATE_SCENARIOS = [0.6, 0.7, 0.8];
     const profitData: ProfitScenario[] = RETURN_RATE_SCENARIOS.map((rate) => {
-      const grossProfit = totalUnitPrices * (1 - rate);
+      const grossProfit = totalUnitPrices * (1 - rate) - totalSupportFee;
       const costEffectiveness = (grossProfit / COST_EFFECTIVENESS_BASELINE) * 100;
       return {
         returnRate: rate * 100,
@@ -106,9 +110,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       };
     });
 
-    // 各要員の還元率・原価・粗利・診断 (還元率はUIで選択可能)
+    // 各要員の還元率・原価・実質粗利・診断 (還元率はUIで選択可能)
+    // 実質粗利 = 売上単価 - 還元額（売上単価×還元率） - 支援費
     const memberCalculations: MemberCalculation[] = data.members.map((m) => {
-      const grossProfit = m.unitPrice * (1 - selectedReturnRate);
+      const grossProfit = m.unitPrice * (1 - selectedReturnRate) - m.supportFee;
       return {
         ...m,
         returnRate: selectedReturnRate * 100,
@@ -135,8 +140,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     );
     const offerEvaluation = evaluateAbove(offerRate, OFFER_RATE_GOOD_THRESHOLD, '良好な水準', '重要課題');
 
-    // 選択中の還元率における想定粗利（全体実績カードのKPI用）
-    const selectedGrossProfit = totalUnitPrices * (1 - selectedReturnRate);
+    // 選択中の還元率における実質粗利（全体実績カードのKPI用）
+    const selectedGrossProfit = totalUnitPrices * (1 - selectedReturnRate) - totalSupportFee;
 
     // ファネルのバー幅（提案数を100%とした割合）
     const interviewBarWidth = totalProposals > 0 ? Math.min(100, (totalInterviews / totalProposals) * 100) : 0;
@@ -147,6 +152,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       totalOffers,
       totalInterviews,
       totalProposals,
+      totalSupportFee,
       profitData,
       memberCalculations,
       diagnosisGroups,
@@ -532,10 +538,15 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               </div>
             </div>
             <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100 text-center">
-              <p className="text-xs font-semibold text-green-800">想定粗利（{selectedReturnRate * 100}%還元時）</p>
+              <p className="text-xs font-semibold text-green-800">実質粗利（{selectedReturnRate * 100}%還元・支援費控除後）</p>
               <p className="font-display text-2xl font-extrabold mt-1.5 text-green-600 tabular-nums">
                 {formatCurrency(calculatedData.selectedGrossProfit)}
               </p>
+              {calculatedData.totalSupportFee > 0 && (
+                <p className="text-[11px] text-green-700/70 mt-1">
+                  支援費合計 {formatCurrency(calculatedData.totalSupportFee)} を控除済み
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -626,16 +637,16 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           )}
         </section>
 
-        {/* 還元率別の想定粗利と対効果 */}
+        {/* 還元率別の実質粗利と対効果 */}
         <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
-          <h2 className="text-lg font-bold mb-1">還元率別の想定粗利と対効果</h2>
+          <h2 className="text-lg font-bold mb-1">還元率別の実質粗利と対効果</h2>
           <p className="text-xs text-slate-400 mb-3 print:hidden">行をクリックすると下部の還元率が切り替わります</p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-white text-slate-500 font-medium">
                 <tr>
                   <th className="p-3 text-left">還元率</th>
-                  <th className="p-3 text-right">想定粗利</th>
+                  <th className="p-3 text-right">実質粗利</th>
                   <th className="p-3 text-right">費用対効果</th>
                 </tr>
               </thead>
@@ -664,7 +675,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
             </table>
           </div>
           <p className="text-xs text-slate-400 mt-3">
-            費用対効果 = 想定粗利 ÷ {formatCurrency(COST_EFFECTIVENESS_BASELINE)}換算。還元率の上昇に伴う粗利・対効果のトレードオフを可視化。
+            実質粗利 = 売上単価 － 還元額 － 支援費（合計{formatCurrency(calculatedData.totalSupportFee)}）。費用対効果 = 実質粗利 ÷{' '}
+            {formatCurrency(COST_EFFECTIVENESS_BASELINE)}換算。還元率の上昇に伴う粗利・対効果のトレードオフを可視化。
           </p>
         </section>
 
@@ -761,13 +773,14 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   <th className="p-4 text-left">要員ID</th>
                   <th className="p-4 text-left">氏名</th>
                   <th className="p-4 text-right">単価</th>
+                  <th className="p-4 text-right">支援費</th>
                   <th className="p-4 text-center">提案社数</th>
                   <th className="p-4 text-center">面談移行率</th>
                   <th className="p-4 text-center">面談社数</th>
                   <th className="p-4 text-center">オファー社数</th>
                   <th className="p-4 text-center print:hidden">案件母数</th>
                   <th className="p-4 text-left print:hidden">営業終了理由</th>
-                  <th className="p-4 text-right">粗利額（{selectedReturnRate * 100}%還元）</th>
+                  <th className="p-4 text-right">実質粗利（{selectedReturnRate * 100}%還元・支援費控除後）</th>
                   <th className="p-4 text-left">診断結果</th>
                   <th className="p-4 text-left">今後の対策</th>
                   {isEditing && <th className="p-4 text-center print:hidden">操作</th>}
@@ -798,6 +811,18 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                         />
                       ) : (
                         formatCurrency(m.unitPrice)
+                      )}
+                    </td>
+                    <td className="p-4 text-right">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          className="w-24 rounded border border-slate-200 px-2 py-1 text-right"
+                          value={m.supportFee}
+                          onChange={(e) => updateMember(m.id, { supportFee: Number(e.target.value) })}
+                        />
+                      ) : (
+                        formatCurrency(m.supportFee)
                       )}
                     </td>
                     <td className="p-4 text-center">

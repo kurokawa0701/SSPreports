@@ -11,7 +11,7 @@
 //   面談数 |    |     1 |     1 |     3 | ...
 //
 // 面談移行率・オファー獲得率の行は自前で計算し直すため読み飛ばす。
-// 「案件母数」「営業終了理由」の行がある場合は任意項目として読み込む（無くてもエラーにはならない）。
+// 「案件母数」「営業終了理由」「支援費」の行がある場合は任意項目として読み込む（無くてもエラーにはならない。支援費は未指定なら0）。
 
 import type { MemberData } from './types';
 import type { CsvImportResult, ImportRow } from './csv';
@@ -31,13 +31,14 @@ export function looksLikeSspTemplate(rows: ImportRow[]): boolean {
   return rows.some((row) => cellToString(row[0]) === '要員別');
 }
 
-type NumericMetricKey = 'proposals' | 'interviews' | 'offers' | 'unitPrice' | 'casePoolSize';
+type NumericMetricKey = 'proposals' | 'interviews' | 'offers' | 'unitPrice' | 'casePoolSize' | 'supportFee';
 type StringMetricKey = 'closeReason';
 
 function matchNumericMetricKey(label: string): NumericMetricKey | null {
   if (label.includes('提案数')) return 'proposals';
   if (label.includes('面談数')) return 'interviews';
   if (label.includes('オファー数')) return 'offers';
+  if (label.includes('支援費')) return 'supportFee';
   if (label.includes('単価')) return 'unitPrice';
   if (label.includes('案件母数')) return 'casePoolSize';
   return null; // 面談移行率・オファー獲得率などは計算し直すのでスキップ
@@ -99,6 +100,7 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
     offers: {},
     unitPrice: {},
     casePoolSize: {},
+    supportFee: {},
   };
   const stringValues: Record<StringMetricKey, Record<number, string>> = {
     closeReason: {},
@@ -137,6 +139,7 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
       interviews: values.interviews[colIndex] ?? 0,
       offers: values.offers[colIndex] ?? 0,
       unitPrice: values.unitPrice[colIndex] ?? 0,
+      supportFee: values.supportFee[colIndex] ?? 0,
       ...(casePoolSize !== undefined ? { casePoolSize } : {}),
       ...(closeReason !== undefined ? { closeReason } : {}),
     };

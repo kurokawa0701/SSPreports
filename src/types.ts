@@ -8,6 +8,7 @@ export interface MemberData {
   interviews: number;    // 面談数
   offers: number;        // オファー数
   unitPrice: number;     // オファー単価
+  supportFee: number;    // 支援費（要員1名あたりの月額想定コスト。実質粗利の算出に使用）
   casePoolSize?: number; // 案件母数（紹介可能だった案件の総数。任意項目）
   closeReason?: string;  // 営業終了理由（オファーに至らず終了した場合の理由。任意項目）
   // 要員ごとの「今後の対策」の自由編集テキスト。空/未入力なら診断ラベルから自動生成した内容を表示する。
@@ -45,13 +46,13 @@ export interface Diagnosis {
 export interface MemberCalculation extends MemberData {
   returnRate: number;   // % (選択された還元率)
   baseCost: number;     // 還元社原価
-  grossProfit: number;  // 粗利額
+  grossProfit: number;  // 実質粗利額 (= 売上単価 - 還元額 - 支援費)
   diagnosis: Diagnosis;
 }
 
-// 還元率別 (60/70/80%) の全体粗利・対効果シミュレーション結果
+// 還元率別 (60/70/80%) の全体実質粗利・対効果シミュレーション結果
 export interface ProfitScenario {
   returnRate: number; // % (要員への還元率)
-  grossProfit: number; // 想定粗利
-  costEffectiveness: number; // 費用対効果 (= 粗利 ÷ 還元コスト × 100)
+  grossProfit: number; // 実質粗利 (= 売上単価 - 還元額 - 支援費の合計)
+  costEffectiveness: number; // 費用対効果 (= 実質粗利 ÷ 固定基準額 × 100)
 }
