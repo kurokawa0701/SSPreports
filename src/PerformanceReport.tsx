@@ -576,8 +576,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           </div>
         </section>
 
-        {/* ファネル分析 */}
-        <section className="print-section p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col">
+        {/* ファネル分析（「全体実績」と同じページに置くため print-section は付けない） */}
+        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col">
           <h2 className="text-lg font-bold mb-4">ファネル分析</h2>
           {hasMembers ? (
             <div className="flex-1 flex flex-col justify-center">
@@ -662,7 +662,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           )}
         </section>
 
-        {/* 還元率別の実質粗利と対効果 */}
+        {/* 還元率別の実質粗利と対効果。ここから新しいページを始め、
+            続く「要員別診断と今後の対策」と同じページに収める */}
         <section className="print-section p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-1">還元率別の実質粗利と対効果</h2>
           <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -697,7 +698,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
 
         {/* 要員別診断と今後の対策。要員数に応じて高さが変わるため、ブロック単位ではなく
             カード単位で改ページを避ける（ブロック全体をavoidにすると用紙下部が大きく空く） */}
-        <section className="print-section p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300">
+        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300">
           <h2 className="text-lg font-bold mb-4 print:break-after-avoid">要員別診断と今後の対策</h2>
           {hasMembers ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
