@@ -11,7 +11,8 @@
 //   面談数 |    |     1 |     1 |     3 | ...
 //
 // 面談移行率・オファー獲得率の行は自前で計算し直すため読み飛ばす。
-// 「営業終了理由」「支援費」の行がある場合は任意項目として読み込む（無くてもエラーにはならない。支援費は未指定なら0）。
+// 「営業終了理由」「支援費」「提案が伸びない要因」の行がある場合は任意項目として読み込む
+// （無くてもエラーにはならない。支援費は未指定なら0）。
 
 import type { MemberData } from './types';
 import type { CsvImportResult, ImportRow } from './csv';
@@ -32,7 +33,7 @@ export function looksLikeSspTemplate(rows: ImportRow[]): boolean {
 }
 
 type NumericMetricKey = 'proposals' | 'interviews' | 'offers' | 'unitPrice' | 'supportFee';
-type StringMetricKey = 'closeReason';
+type StringMetricKey = 'closeReason' | 'proposalReason';
 
 function matchNumericMetricKey(label: string): NumericMetricKey | null {
   if (label.includes('提案数')) return 'proposals';
@@ -45,6 +46,9 @@ function matchNumericMetricKey(label: string): NumericMetricKey | null {
 
 function matchStringMetricKey(label: string): StringMetricKey | null {
   if (label.includes('終了理由')) return 'closeReason';
+  // 「提案が伸びない要因」「提案要因」など、提案数が伸びない理由を書く行。
+  // 「提案数」の行と誤認しないよう、数値メトリクスの判定より後に評価される点に注意。
+  if (label.includes('要因')) return 'proposalReason';
   return null;
 }
 
@@ -102,6 +106,7 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
   };
   const stringValues: Record<StringMetricKey, Record<number, string>> = {
     closeReason: {},
+    proposalReason: {},
   };
 
   for (let r = nameRowIndex + 1; r < rows.length; r++) {
@@ -129,6 +134,7 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
 
   const members: MemberData[] = memberColumns.map(({ colIndex, name }, idx) => {
     const closeReason = stringValues.closeReason[colIndex];
+    const proposalReason = stringValues.proposalReason[colIndex];
     return {
       id: `${Date.now()}-${idx}`,
       name,
@@ -138,6 +144,7 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
       unitPrice: values.unitPrice[colIndex] ?? 0,
       supportFee: values.supportFee[colIndex] ?? 0,
       ...(closeReason !== undefined ? { closeReason } : {}),
+      ...(proposalReason !== undefined ? { proposalReason } : {}),
     };
   });
 

@@ -791,6 +791,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   <th className="p-4 text-center">面談社数</th>
                   <th className="p-4 text-center">オファー社数</th>
                   <th className="p-4 text-left print:hidden">営業終了理由</th>
+                  <th className="p-4 text-left print:hidden">提案が伸びない要因</th>
                   <th className="p-4 text-right">実質粗利（{selectedReturnRate * 100}%還元・支援費控除後）</th>
                   <th className="p-4 text-left">診断結果</th>
                   <th className="p-4 text-left">今後の対策</th>
@@ -885,6 +886,18 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                         />
                       ) : (
                         (m.closeReason || '－')
+                      )}
+                    </td>
+                    <td className="p-4 text-left print:hidden">
+                      {isEditing ? (
+                        <input
+                          className="w-40 rounded border border-slate-200 px-2 py-1"
+                          placeholder="任意（例：想定単価に合う案件が少ない）"
+                          value={m.proposalReason ?? ''}
+                          onChange={(e) => updateMember(m.id, { proposalReason: e.target.value })}
+                        />
+                      ) : (
+                        (m.proposalReason || '－')
                       )}
                     </td>
                     <td className="p-4 text-right font-bold text-indigo-700 tabular-nums">{formatCurrency(m.grossProfit)}</td>
@@ -995,6 +1008,14 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   </span>
                   {m.closeReason && <span className="ml-auto text-slate-400">営業終了理由：{m.closeReason}</span>}
                 </div>
+
+                {/* 提案が伸びない要因。提案数が少ない場合に「稼働していない」と誤読されないよう、
+                    入力があれば印刷レイアウトにも必ず表示する。 */}
+                {m.proposalReason && (
+                  <div className="px-4 py-1.5 border-b border-slate-200 text-[10px] text-slate-500">
+                    提案が伸びない要因：{m.proposalReason}
+                  </div>
+                )}
 
                 <div className="px-4 py-3 grid grid-cols-2 gap-4">
                   <div>
