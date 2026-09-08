@@ -36,16 +36,6 @@ export interface DiagnosisContext {
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
 
 /**
- * 案件母数（casePoolSize）が入力されている場合、提案消化率をコメント末尾に補足する。
- * 「紹介できる案件はあるのに提案数が少ない」といった、提案数だけでは見えない状況を反映する。
- */
-function appendCaseContext(comment: string, m: MemberData): string {
-  if (!m.casePoolSize || m.casePoolSize <= 0) return comment;
-  const rate = m.proposals / m.casePoolSize;
-  return `${comment}（案件母数${m.casePoolSize}件中${m.proposals}件へ提案・消化率${pct(rate)}）`;
-}
-
-/**
  * 営業終了理由（closeReason）が入力されている場合、コメント末尾に補足する。
  * オファーに至らず終了したケースでは、推測ではなく実際の終了理由を診断に反映する。
  * すでにオファーが出ている（成約）ケースでは終了理由は付けない。
@@ -60,7 +50,7 @@ function appendCloseReason(comment: string, m: MemberData): string {
 export function diagnoseMember(m: MemberData, context: DiagnosisContext): Diagnosis {
   const finalize = (d: Diagnosis): Diagnosis => ({
     ...d,
-    comment: appendCloseReason(appendCaseContext(d.comment, m), m),
+    comment: appendCloseReason(d.comment, m),
   });
 
   if (m.proposals === 0) {

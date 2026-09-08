@@ -782,7 +782,6 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   <th className="p-4 text-center">面談移行率</th>
                   <th className="p-4 text-center">面談社数</th>
                   <th className="p-4 text-center">オファー社数</th>
-                  <th className="p-4 text-center print:hidden">案件母数</th>
                   <th className="p-4 text-left print:hidden">営業終了理由</th>
                   <th className="p-4 text-right">実質粗利（{selectedReturnRate * 100}%還元・支援費控除後）</th>
                   <th className="p-4 text-left">診断結果</th>
@@ -866,23 +865,6 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                         />
                       ) : (
                         m.offers
-                      )}
-                    </td>
-                    <td className="p-4 text-center print:hidden">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          className="w-16 rounded border border-slate-200 px-2 py-1 text-center"
-                          placeholder="任意"
-                          value={m.casePoolSize ?? ''}
-                          onChange={(e) =>
-                            updateMember(m.id, {
-                              casePoolSize: e.target.value === '' ? undefined : Number(e.target.value),
-                            })
-                          }
-                        />
-                      ) : (
-                        (m.casePoolSize ?? '－')
                       )}
                     </td>
                     <td className="p-4 text-left print:hidden">

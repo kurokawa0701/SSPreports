@@ -19,7 +19,6 @@ export const sampleReportData: ReportSummaryData = {
       offers: 1,
       unitPrice: 400000,
       supportFee: 20000,
-      casePoolSize: 8,
     },
     {
       id: '4',
@@ -29,7 +28,6 @@ export const sampleReportData: ReportSummaryData = {
       offers: 0,
       unitPrice: 500000,
       supportFee: 30000,
-      casePoolSize: 12,
       closeReason: '条件不一致',
     },
     {
@@ -40,7 +38,6 @@ export const sampleReportData: ReportSummaryData = {
       offers: 0,
       unitPrice: 500000,
       supportFee: 30000,
-      casePoolSize: 6,
     },
     {
       id: '6',
@@ -50,7 +47,6 @@ export const sampleReportData: ReportSummaryData = {
       offers: 0,
       unitPrice: 500000,
       supportFee: 30000,
-      casePoolSize: 10,
       closeReason: 'スキル不足',
     },
   ],
