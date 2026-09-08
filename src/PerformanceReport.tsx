@@ -172,6 +172,18 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   );
   const displayedHeadline = data.headline.trim() ? data.headline : autoHeadline;
 
+  // 「今後の対策」の自動生成テキスト（編集用テキストエリアのプレースホルダー・リセット先として使用）
+  const autoActionPlanText = calculatedData.actionPlan.join('\n');
+  const displayedActionPlanItems = data.actionPlanText?.trim()
+    ? data.actionPlanText.split('\n').map((s) => s.trim()).filter(Boolean)
+    : calculatedData.actionPlan;
+
+  // 「全体診断（コピペ用）」の自動生成テキスト
+  const autoDiagnosisSummaryText = buildDiagnosisCopyText(calculatedData.diagnosisGroups);
+  const displayedDiagnosisSummaryText = data.diagnosisSummaryText?.trim()
+    ? data.diagnosisSummaryText
+    : autoDiagnosisSummaryText;
+
   // --- ヘルパー関数 ---
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(
@@ -184,7 +196,11 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   };
 
   // --- 編集ハンドラ ---
-  const updateHeaderField = (patch: Partial<Pick<ReportSummaryData, 'clientName' | 'period' | 'headline'>>) => {
+  const updateHeaderField = (
+    patch: Partial<
+      Pick<ReportSummaryData, 'clientName' | 'period' | 'headline' | 'actionPlanText' | 'diagnosisSummaryText'>
+    >
+  ) => {
     setData((prev) => ({ ...prev, ...patch }));
   };
 
@@ -263,7 +279,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   };
 
   const handleCopyDiagnosis = async () => {
-    const text = buildDiagnosisCopyText(calculatedData.diagnosisGroups);
+    const text = displayedDiagnosisSummaryText;
     const showCopied = () => {
       setCopied(true);
       if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
@@ -629,15 +645,38 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   </div>
                 ))}
               </div>
-              <div className="space-y-3">
-                {calculatedData.actionPlan.map((action, idx) => (
-                  <div key={action} className="flex gap-3 p-3 bg-white rounded-xl border border-slate-200">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">
-                      {idx + 1}
-                    </span>
-                    <p className="text-xs leading-relaxed text-slate-700">{action}</p>
+              <div className="space-y-2">
+                {isEditing ? (
+                  <>
+                    <textarea
+                      className="block w-full rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 text-xs leading-relaxed text-slate-900"
+                      rows={6}
+                      placeholder={autoActionPlanText}
+                      value={data.actionPlanText ?? ''}
+                      onChange={(e) => updateHeaderField({ actionPlanText: e.target.value })}
+                    />
+                    {data.actionPlanText?.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => updateHeaderField({ actionPlanText: '' })}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline print:hidden"
+                      >
+                        自動生成に戻す
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    {displayedActionPlanItems.map((action, idx) => (
+                      <div key={`${idx}-${action}`} className="flex gap-3 p-3 bg-white rounded-xl border border-slate-200">
+                        <span className="shrink-0 w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <p className="text-xs leading-relaxed text-slate-700">{action}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
           ) : (
@@ -816,22 +855,47 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               {copied ? 'コピーしました ✓' : 'テキストをコピー'}
             </button>
           </div>
-          <div className="p-6 bg-white rounded-2xl border border-slate-100">
-            <div className="space-y-3 text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto">
-              {calculatedData.diagnosisGroups.map((group) => (
-                <div key={group.label}>
-                  <p className={`inline-block px-2 py-0.5 rounded-full font-semibold mb-1 ${toneBadgeClasses(group.tone)}`}>
-                    {group.label}
-                  </p>
-                  {group.entries.map((entry) => (
-                    <p key={entry.name}>
-                      <span className="font-semibold text-slate-800">【{entry.name}】：</span>
-                      {entry.comment}
+          <div className="p-6 bg-white rounded-2xl border border-slate-100 space-y-2">
+            {isEditing ? (
+              <>
+                <textarea
+                  className="block w-full rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 text-xs leading-relaxed text-slate-900"
+                  rows={10}
+                  placeholder={autoDiagnosisSummaryText}
+                  value={data.diagnosisSummaryText ?? ''}
+                  onChange={(e) => updateHeaderField({ diagnosisSummaryText: e.target.value })}
+                />
+                {data.diagnosisSummaryText?.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => updateHeaderField({ diagnosisSummaryText: '' })}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline print:hidden"
+                  >
+                    自動生成に戻す
+                  </button>
+                )}
+              </>
+            ) : data.diagnosisSummaryText?.trim() ? (
+              <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto">
+                {data.diagnosisSummaryText}
+              </p>
+            ) : (
+              <div className="space-y-3 text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto">
+                {calculatedData.diagnosisGroups.map((group) => (
+                  <div key={group.label}>
+                    <p className={`inline-block px-2 py-0.5 rounded-full font-semibold mb-1 ${toneBadgeClasses(group.tone)}`}>
+                      {group.label}
                     </p>
-                  ))}
-                </div>
-              ))}
-            </div>
+                    {group.entries.map((entry) => (
+                      <p key={entry.name}>
+                        <span className="font-semibold text-slate-800">【{entry.name}】：</span>
+                        {entry.comment}
+                      </p>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       )}

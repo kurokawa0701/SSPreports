@@ -15,6 +15,10 @@ export interface ReportSummaryData {
   period: string;          // レポート期間
   headline: string;        // メインキャッチコピー
   members: MemberData[];
+  // 「今後の対策」の自由編集テキスト（1行1項目）。空/未入力なら診断結果から自動生成した内容を表示する。
+  actionPlanText?: string;
+  // 「全体診断（コピペ用）」の自由編集テキスト。空/未入力なら診断結果から自動生成した内容を表示する。
+  diagnosisSummaryText?: string;
 }
 
 // 還元率別損益シミュレーションの選択肢 (60% / 70% / 80%)
