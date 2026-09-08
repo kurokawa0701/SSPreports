@@ -80,8 +80,6 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   const [data, setData] = useState<ReportSummaryData>(() => initialData ?? sampleReportData);
   const [isEditing, setIsEditing] = useState(startInEditMode);
   const [selectedReturnRate, setSelectedReturnRate] = useState(0.7);
-  // 「還元率別の実質粗利と対効果」表だけで使う独立した還元率。要員別詳細データの還元率選択とは連動させない。
-  const [simulationReturnRate, setSimulationReturnRate] = useState(0.7);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [pendingSheets, setPendingSheets] = useState<Extract<PreparedImport, { kind: 'excel-multi' }> | null>(null);
@@ -662,7 +660,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         {/* 還元率別の実質粗利と対効果 */}
         <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-1">還元率別の実質粗利と対効果</h2>
-          <p className="text-xs text-slate-400 mb-3 print:hidden">行をクリックすると強調表示が切り替わります（比較用の表示のみで、下部の要員別詳細データには影響しません）</p>
+          <p className="text-xs text-slate-400 mb-3 print:hidden">還元率ごとの比較表です（下部の要員別詳細データとは連動しません）</p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-white text-slate-500 font-medium">
@@ -674,18 +672,9 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {calculatedData.profitData.map((profit) => {
-                  const isActive = Math.round(profit.returnRate) === Math.round(simulationReturnRate * 100);
                   return (
-                    <tr
-                      key={profit.returnRate}
-                      onClick={() => setSimulationReturnRate(profit.returnRate / 100)}
-                      className={`cursor-pointer transition-colors print:cursor-auto ${isActive ? 'bg-indigo-50/60' : 'bg-white/60 hover:bg-slate-50'}`}
-                    >
-                      <td
-                        className={`p-3 border-l-[3px] ${isActive ? 'border-l-indigo-600 font-bold text-slate-900' : 'border-l-transparent font-medium text-slate-700'}`}
-                      >
-                        {profit.returnRate}%還元
-                      </td>
+                    <tr key={profit.returnRate} className="bg-white/60">
+                      <td className="p-3 font-medium text-slate-700">{profit.returnRate}%還元</td>
                       <td className="p-3 text-right font-semibold tabular-nums">{formatCurrency(profit.grossProfit)}</td>
                       <td className="p-3 text-right font-bold text-indigo-600 tabular-nums">
                         {profit.costEffectiveness.toFixed(0)}%
