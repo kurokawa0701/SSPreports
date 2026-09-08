@@ -49,7 +49,7 @@ export function diagnoseMember(m: MemberData): Diagnosis {
   if (interviewRate < INTERVIEW_RATE_LOW_THRESHOLD) {
     return {
       tone: 'warning',
-      label: '提案先ミスマッチ?',
+      label: '提案先ミスマッチ',
       comment: `提案${m.proposals}社に対して面談${m.interviews}社（面談移行率${pct(interviewRate)}）と低調。提案先とのミスマッチが考えられるため、提案先を再検討。`,
     };
   }
@@ -57,7 +57,7 @@ export function diagnoseMember(m: MemberData): Diagnosis {
   if (m.offers === 0) {
     return {
       tone: 'info',
-      label: 'スキルアンマッチ?',
+      label: 'スキルアンマッチ',
       comment: `面談${m.interviews}社（面談移行率${pct(interviewRate)}）まで進めているものの、オファー0社。スキルアンマッチ・経歴相違・面談スキル・案件選定を再検討。`,
     };
   }
@@ -158,8 +158,8 @@ export function evaluateAbove(
 /** 診断ラベルごとの推奨アクション文。要員別診断カードの隣に出す「今後の対策」リストに使う */
 export const ACTION_RECOMMENDATIONS: Record<string, string> = {
   'スキル・面談力OK': '成功事例の横展開：好調な要員の提案・面談のノウハウをチーム全体へ共有する。',
-  '提案先ミスマッチ?': '提案先の選定見直し：ターゲット業界・案件レイヤーを再検討し、提案の精度を高める。',
-  'スキルアンマッチ?': '面談対策の強化：面談には進むもののオファーに至らないため、スキルシートや訴求内容を見直す。',
+  '提案先ミスマッチ': '提案先の選定見直し：ターゲット業界・案件レイヤーを再検討し、提案の精度を高める。',
+  'スキルアンマッチ': '面談対策の強化：面談には進むもののオファーに至らないため、スキルシートや訴求内容を見直す。',
   '判断材料不足': '提案数の底上げ：まずは提案数を増やし、傾向を判断できるだけのデータを蓄積する。',
   '提案未実施': '提案の開始：対象案件の選定と提案活動をまず開始する。',
   '傾向を注視': '継続観察：現状のペースを維持しつつ、次回以降の推移を確認する。',
