@@ -2,6 +2,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import type {
+  Diagnosis,
   MemberCalculation,
   MemberData,
   ProfitScenario,
@@ -118,12 +119,19 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     // 実質粗利 = 売上単価 - 還元額（売上単価×還元率） - 支援費
     const memberCalculations: MemberCalculation[] = data.members.map((m) => {
       const grossProfit = m.unitPrice * (1 - selectedReturnRate) - m.supportFee;
+      const autoDiagnosis = diagnoseMember(m, { teamInterviewRate: teamInterviewRateForDiagnosis });
+      // 診断コメントはdiagnosisNoteで上書き可能（要員ごとに編集して送付できるようにするため）。
+      // ラベル・トーン（分類）は自動診断のまま維持し、文章のみ差し替える。
+      const diagnosis: Diagnosis = m.diagnosisNote?.trim()
+        ? { ...autoDiagnosis, comment: m.diagnosisNote }
+        : autoDiagnosis;
       return {
         ...m,
         returnRate: selectedReturnRate * 100,
         baseCost: m.unitPrice * selectedReturnRate,
         grossProfit,
-        diagnosis: diagnoseMember(m, { teamInterviewRate: teamInterviewRateForDiagnosis }),
+        diagnosis,
+        autoDiagnosisComment: autoDiagnosis.comment,
       };
     });
 
@@ -884,7 +892,16 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                       <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${toneBadgeClasses(m.diagnosis.tone)}`}>
                         {m.diagnosis.label}
                       </span>
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-500 max-w-xs print:max-w-[160px]">{m.diagnosis.comment}</p>
+                      {isEditing ? (
+                        <textarea
+                          className="mt-1.5 w-56 rounded border border-slate-200 px-2 py-1 text-xs leading-relaxed"
+                          rows={3}
+                          value={m.diagnosisNote?.trim() ? m.diagnosisNote : m.autoDiagnosisComment}
+                          onChange={(e) => updateMember(m.id, { diagnosisNote: e.target.value })}
+                        />
+                      ) : (
+                        <p className="mt-1.5 text-xs leading-relaxed text-slate-500 max-w-xs print:max-w-[160px]">{m.diagnosis.comment}</p>
+                      )}
                     </td>
                     <td className="p-4 text-left align-top">
                       {isEditing ? (

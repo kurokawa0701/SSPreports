@@ -12,6 +12,8 @@ export interface MemberData {
   closeReason?: string;  // 営業終了理由（オファーに至らず終了した場合の理由。任意項目）
   // 要員ごとの「今後の対策」の自由編集テキスト。空/未入力なら診断ラベルから自動生成した内容を表示する。
   actionNote?: string;
+  // 要員ごとの「診断結果」コメントの自由編集テキスト。空/未入力なら自動診断のコメントを表示する。
+  diagnosisNote?: string;
 }
 
 export interface ReportSummaryData {
@@ -46,7 +48,8 @@ export interface MemberCalculation extends MemberData {
   returnRate: number;   // % (選択された還元率)
   baseCost: number;     // 還元社原価
   grossProfit: number;  // 実質粗利額 (= 売上単価 - 還元額 - 支援費)
-  diagnosis: Diagnosis;
+  diagnosis: Diagnosis; // diagnosisNoteで上書きされている場合はcommentがその内容になる
+  autoDiagnosisComment: string; // 自動診断本来のコメント（編集欄のプレースホルダー・リセット先として使用）
 }
 
 // 還元率別 (60/70/80%) の全体実質粗利・対効果シミュレーション結果
