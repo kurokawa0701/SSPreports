@@ -110,6 +110,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       };
     });
 
+    // 要員個別の診断はチーム平均の面談移行率に対する相対評価で行う（固定%だと、チーム全体の水準が
+    // 低い/高い時期に全員が同じ診断に一律で分類されてしまうため）
+    const teamInterviewRateForDiagnosis = totalProposals > 0 ? totalInterviews / totalProposals : 0;
+
     // 各要員の還元率・原価・実質粗利・診断 (還元率はUIで選択可能)
     // 実質粗利 = 売上単価 - 還元額（売上単価×還元率） - 支援費
     const memberCalculations: MemberCalculation[] = data.members.map((m) => {
@@ -119,7 +123,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         returnRate: selectedReturnRate * 100,
         baseCost: m.unitPrice * selectedReturnRate,
         grossProfit,
-        diagnosis: diagnoseMember(m),
+        diagnosis: diagnoseMember(m, { teamInterviewRate: teamInterviewRateForDiagnosis }),
       };
     });
 

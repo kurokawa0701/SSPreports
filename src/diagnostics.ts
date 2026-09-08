@@ -13,16 +13,25 @@ export const MIN_SAMPLE_PROPOSALS = 3;
 /** 面談数のうちオファーに至った割合がこれ以上なら「良好」と判断する */
 export const OFFER_RATE_GOOD_THRESHOLD = 0.2;
 
-/** 提案数のうち面談に至った割合がこれ未満なら「提案先ミスマッチ」の疑いと判断する */
+/** 提案数のうち面談に至った割合がこれ未満なら「提案先ミスマッチ」の疑いと判断する（チーム全体の評価・ファネル分析に使用） */
 export const INTERVIEW_RATE_LOW_THRESHOLD = 0.5;
 
 /**
- * 面談移行率がこれ未満の場合は、単なる「改善余地あり」ではなく
- * 明確な「提案先ミスマッチ」として強めに判定する。
- * INTERVIEW_RATE_LOW_THRESHOLDとの間（このしきい値以上・LOW_THRESHOLD未満）は
- * 軽度な課題として別ラベルに分け、全員が同じ診断に一律で分類されるのを防ぐ。
+ * 要員個別の診断は、固定の絶対値（%）ではなく「チーム平均の面談移行率」に対する相対評価で行う。
+ * 業種・時期によってチーム全体の面談移行率の水準自体が大きく変動するため、
+ * 30%や50%といった固定しきい値では実データにおいて全員が同じ診断（例：全員「提案先ミスマッチ」）に
+ * 一律で分類されてしまう問題があった。チーム平均と比較することで、平均が低い時期でも
+ * 相対的に良い/悪いを個別に判定できるようにしている。
  */
-export const INTERVIEW_RATE_SEVERE_THRESHOLD = 0.3;
+/** チーム平均の面談移行率に対して、この比率未満なら明確な「提案先ミスマッチ」と判定する */
+export const RELATIVE_INTERVIEW_SEVERE_RATIO = 0.5;
+/** チーム平均の面談移行率に対して、この比率未満なら「改善余地あり」と判定する（severeとの間は軽度な課題） */
+export const RELATIVE_INTERVIEW_LOW_RATIO = 1.0;
+
+export interface DiagnosisContext {
+  /** チーム全体の面談移行率（面談数合計 ÷ 提案数合計）。個別診断の相対評価の基準値として使う */
+  teamInterviewRate: number;
+}
 
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
 
@@ -48,7 +57,7 @@ function appendCloseReason(comment: string, m: MemberData): string {
   return `${comment}（終了理由：${reason}）`;
 }
 
-export function diagnoseMember(m: MemberData): Diagnosis {
+export function diagnoseMember(m: MemberData, context: DiagnosisContext): Diagnosis {
   const finalize = (d: Diagnosis): Diagnosis => ({
     ...d,
     comment: appendCloseReason(appendCaseContext(d.comment, m), m),
@@ -92,29 +101,32 @@ export function diagnoseMember(m: MemberData): Diagnosis {
     });
   }
 
-  // 3. 面談移行率が著しく低い（severeしきい値未満）→ 明確な提案先ミスマッチ
-  if (interviewRate < INTERVIEW_RATE_SEVERE_THRESHOLD) {
+  // 3. ここから先はチーム平均の面談移行率と比較した相対評価。
+  //    チーム平均が高い時期・低い時期のどちらでも、平均に対する相対的な良し悪しで個別に判定する。
+  const teamRate = context.teamInterviewRate;
+  const relativeRatio = teamRate > 0 ? interviewRate / teamRate : interviewRate > 0 ? Infinity : 0;
+
+  if (relativeRatio < RELATIVE_INTERVIEW_SEVERE_RATIO) {
     return finalize({
       tone: 'warning',
       label: '提案先ミスマッチ',
-      comment: `提案${m.proposals}社に対して面談${m.interviews}社（面談移行率${pct(interviewRate)}）と低調。提案先とのミスマッチが考えられるため、提案先を再検討。`,
+      comment: `提案${m.proposals}社に対して面談${m.interviews}社（面談移行率${pct(interviewRate)}、チーム平均${pct(teamRate)}の${pct(relativeRatio)}水準）と低調。提案先とのミスマッチが考えられるため、提案先を再検討。`,
     });
   }
 
-  // 4. 面談移行率がやや低い（severeしきい値〜lowしきい値）→ 致命的ではないが改善余地あり
-  if (interviewRate < INTERVIEW_RATE_LOW_THRESHOLD) {
+  if (relativeRatio < RELATIVE_INTERVIEW_LOW_RATIO) {
     return finalize({
       tone: 'info',
       label: '提案精度に改善余地',
-      comment: `提案${m.proposals}社に対して面談${m.interviews}社（面談移行率${pct(interviewRate)}）。致命的な水準ではないが、提案先の絞り込みでさらなる改善が期待できる。`,
+      comment: `提案${m.proposals}社に対して面談${m.interviews}社（面談移行率${pct(interviewRate)}、チーム平均${pct(teamRate)}）。チーム平均をやや下回るが致命的な水準ではなく、提案先の絞り込みでさらなる改善が期待できる。`,
     });
   }
 
-  // 5. 面談は十分に取れているがオファーが1件もない → スキル・経歴面のアンマッチ
+  // 4. 面談はチーム平均以上に取れているがオファーが1件もない → スキル・経歴面のアンマッチ
   return finalize({
     tone: 'info',
     label: 'スキルアンマッチ',
-    comment: `面談${m.interviews}社（面談移行率${pct(interviewRate)}）まで進めているものの、オファー0社。スキルアンマッチ・経歴相違・面談スキル・案件選定を再検討。`,
+    comment: `面談${m.interviews}社（面談移行率${pct(interviewRate)}、チーム平均以上）まで進めているものの、オファー0社。スキルアンマッチ・経歴相違・面談スキル・案件選定を再検討。`,
   });
 }
 
