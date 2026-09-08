@@ -690,10 +690,6 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-slate-400 mt-3">
-            実質粗利 = 売上単価 － 還元額 － 支援費（合計{formatCurrency(calculatedData.totalSupportFee)}）。費用対効果 = 実質粗利 ÷{' '}
-            {formatCurrency(COST_EFFECTIVENESS_BASELINE)}換算。還元率の上昇に伴う粗利・対効果のトレードオフを可視化。
-          </p>
         </section>
 
         {/* 要員別診断と今後の対策。要員数に応じて高さが変わるため、ブロック単位ではなく
