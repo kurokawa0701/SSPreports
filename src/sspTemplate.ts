@@ -32,7 +32,7 @@ export function looksLikeSspTemplate(rows: ImportRow[]): boolean {
   return rows.some((row) => cellToString(row[0]) === '要員別');
 }
 
-type NumericMetricKey = 'proposals' | 'interviews' | 'offers' | 'unitPrice' | 'supportFee';
+type NumericMetricKey = 'proposals' | 'interviews' | 'offers' | 'unitPrice' | 'proposalUnitPrice' | 'supportFee';
 type StringMetricKey = 'closeReason' | 'proposalReason';
 
 function matchNumericMetricKey(label: string): NumericMetricKey | null {
@@ -40,6 +40,8 @@ function matchNumericMetricKey(label: string): NumericMetricKey | null {
   if (label.includes('面談数')) return 'interviews';
   if (label.includes('オファー数')) return 'offers';
   if (label.includes('支援費')) return 'supportFee';
+  // 「提案単価」は「単価」を含むため、オファー単価より先に判定する（順序を入れ替えないこと）
+  if (label.includes('提案単価')) return 'proposalUnitPrice';
   if (label.includes('単価')) return 'unitPrice';
   return null; // 面談移行率・オファー獲得率などは計算し直すのでスキップ
 }
@@ -102,6 +104,7 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
     interviews: {},
     offers: {},
     unitPrice: {},
+    proposalUnitPrice: {},
     supportFee: {},
   };
   const stringValues: Record<StringMetricKey, Record<number, string>> = {
@@ -135,6 +138,7 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
   const members: MemberData[] = memberColumns.map(({ colIndex, name }, idx) => {
     const closeReason = stringValues.closeReason[colIndex];
     const proposalReason = stringValues.proposalReason[colIndex];
+    const proposalUnitPrice = values.proposalUnitPrice[colIndex];
     return {
       id: `${Date.now()}-${idx}`,
       name,
@@ -145,6 +149,7 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
       supportFee: values.supportFee[colIndex] ?? 0,
       ...(closeReason !== undefined ? { closeReason } : {}),
       ...(proposalReason !== undefined ? { proposalReason } : {}),
+      ...(proposalUnitPrice !== undefined ? { proposalUnitPrice } : {}),
     };
   });
 

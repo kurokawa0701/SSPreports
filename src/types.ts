@@ -7,7 +7,11 @@ export interface MemberData {
   proposals: number;     // 提案数
   interviews: number;    // 面談数
   offers: number;        // オファー数
-  unitPrice: number;     // オファー単価
+  unitPrice: number;     // オファー単価（実際に獲得した単価。売上・実質粗利・費用対効果はすべてこの値で計算する）
+  // 提案時の単価（任意項目）。金額計算には使わず、「どの単価帯で提案しているか」を示す情報として表示する。
+  // オファーが出た場合は、提案単価との差額（値下げ幅）が読み取れる。
+  // オファー未獲得の要員でも単価帯が分かるため、単価欄が¥0のまま並ぶのを防げる。
+  proposalUnitPrice?: number;
   supportFee: number;    // 支援費（要員1名あたりの月額想定コスト。実質粗利の算出に使用）
   closeReason?: string;  // 営業終了理由（オファーに至らず終了した場合の理由。任意項目）
   // 提案が伸びない要因（提案数が0件〜少数の場合に、その理由を明記するための任意項目）。

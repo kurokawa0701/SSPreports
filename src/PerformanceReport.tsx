@@ -84,7 +84,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
 
   // --- 自動計算ロジック ---
   const calculatedData = useMemo(() => {
-    const totalUnitPrices = data.members.reduce((sum, m) => sum + m.unitPrice, 0);
+    // 売上として計上できるのはオファーを獲得した分だけ。オファー0件の要員に単価が入っていても
+    // 売上・実質粗利には乗せない（提案しただけでは売上は発生しないため）。
+    const wonUnitPrice = (m: MemberData) => (m.offers > 0 ? m.unitPrice : 0);
+    const totalUnitPrices = data.members.reduce((sum, m) => sum + wonUnitPrice(m), 0);
     const totalOffers = data.members.reduce((sum, m) => sum + m.offers, 0);
     const totalInterviews = data.members.reduce((sum, m) => sum + m.interviews, 0);
     const totalProposals = data.members.reduce((sum, m) => sum + m.proposals, 0);
@@ -113,7 +116,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     // 各要員の還元率・原価・実質粗利・診断 (還元率はUIで選択可能)
     // 実質粗利 = 売上単価 - 還元額（売上単価×還元率） - 支援費
     const memberCalculations: MemberCalculation[] = data.members.map((m) => {
-      const grossProfit = m.unitPrice * (1 - selectedReturnRate) - m.supportFee;
+      const grossProfit = wonUnitPrice(m) * (1 - selectedReturnRate) - m.supportFee;
       const autoDiagnosis = diagnoseMember(m, { teamInterviewRate: teamInterviewRateForDiagnosis });
       // 診断コメントはdiagnosisNoteで上書き可能（要員ごとに編集して送付できるようにするため）。
       // ラベル・トーン（分類）は自動診断のまま維持し、文章のみ差し替える。
@@ -123,7 +126,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       return {
         ...m,
         returnRate: selectedReturnRate * 100,
-        baseCost: m.unitPrice * selectedReturnRate,
+        baseCost: wonUnitPrice(m) * selectedReturnRate,
         grossProfit,
         diagnosis,
         autoDiagnosisComment: autoDiagnosis.comment,
@@ -786,7 +789,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 <tr>
                   <th className="p-4 text-left">要員ID</th>
                   <th className="p-4 text-left">氏名</th>
-                  <th className="p-4 text-right">単価</th>
+                  <th className="p-4 text-right">提案単価</th>
+                  <th className="p-4 text-right">オファー単価</th>
                   <th className="p-4 text-right">支援費</th>
                   <th className="p-4 text-center">提案社数</th>
                   <th className="p-4 text-center">面談移行率</th>
@@ -815,6 +819,25 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                         m.name
                       )}
                     </td>
+                    <td className="p-4 text-right text-slate-500">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          className="w-28 rounded border border-slate-200 px-2 py-1 text-right"
+                          placeholder="任意"
+                          value={m.proposalUnitPrice ?? ''}
+                          onChange={(e) =>
+                            updateMember(m.id, {
+                              proposalUnitPrice: e.target.value === '' ? undefined : Number(e.target.value),
+                            })
+                          }
+                        />
+                      ) : m.proposalUnitPrice !== undefined ? (
+                        formatCurrency(m.proposalUnitPrice)
+                      ) : (
+                        '－'
+                      )}
+                    </td>
                     <td className="p-4 text-right font-bold">
                       {isEditing ? (
                         <input
@@ -823,8 +846,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                           value={m.unitPrice}
                           onChange={(e) => updateMember(m.id, { unitPrice: Number(e.target.value) })}
                         />
-                      ) : (
+                      ) : m.offers > 0 ? (
                         formatCurrency(m.unitPrice)
+                      ) : (
+                        <span className="font-normal text-slate-400">－</span>
                       )}
                     </td>
                     <td className="p-4 text-right">
@@ -902,7 +927,13 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                         (m.proposalReason || '－')
                       )}
                     </td>
-                    <td className="p-4 text-right font-bold text-indigo-700 tabular-nums">{formatCurrency(m.grossProfit)}</td>
+                    <td
+                      className={`p-4 text-right font-bold tabular-nums ${
+                        m.grossProfit < 0 ? 'text-slate-400' : 'text-indigo-700'
+                      }`}
+                    >
+                      {formatCurrency(m.grossProfit)}
+                    </td>
                     <td className="p-4 text-left align-top">
                       <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${toneBadgeClasses(m.diagnosis.tone)}`}>
                         {m.diagnosis.label}
@@ -978,17 +1009,44 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 </div>
 
                 <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 text-center">
+                  {/* オファーが出た要員はオファー単価（提案単価があれば差額を併記）、
+                      オファー未獲得の要員は提案単価を出す。単価欄が¥0のまま並ぶのを避けるため。 */}
                   <div className="px-2 py-2">
-                    <p className="text-[9px] text-slate-400">単価</p>
-                    <p className="text-xs font-bold tabular-nums">{formatCurrency(m.unitPrice)}</p>
+                    {m.offers > 0 ? (
+                      <>
+                        <p className="text-[9px] text-slate-400">オファー単価</p>
+                        <p className="text-xs font-bold tabular-nums">{formatCurrency(m.unitPrice)}</p>
+                        {m.proposalUnitPrice !== undefined && m.proposalUnitPrice !== m.unitPrice && (
+                          <p className="text-[8px] text-slate-400 tabular-nums">
+                            提案 {formatCurrency(m.proposalUnitPrice)}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[9px] text-slate-400">提案単価</p>
+                        <p className="text-xs font-bold tabular-nums">
+                          {m.proposalUnitPrice !== undefined ? formatCurrency(m.proposalUnitPrice) : '－'}
+                        </p>
+                        <p className="text-[8px] text-slate-400">オファー未獲得</p>
+                      </>
+                    )}
                   </div>
                   <div className="px-2 py-2">
                     <p className="text-[9px] text-slate-400">支援費</p>
                     <p className="text-xs font-bold tabular-nums">{formatCurrency(m.supportFee)}</p>
                   </div>
-                  <div className="px-2 py-2 bg-emerald-50">
-                    <p className="text-[9px] text-emerald-700">実質粗利（{selectedReturnRate * 100}%還元）</p>
-                    <p className="text-xs font-extrabold text-emerald-700 tabular-nums">{formatCurrency(m.grossProfit)}</p>
+                  <div className={`px-2 py-2 ${m.grossProfit < 0 ? 'bg-slate-50' : 'bg-emerald-50'}`}>
+                    <p className={`text-[9px] ${m.grossProfit < 0 ? 'text-slate-500' : 'text-emerald-700'}`}>
+                      実質粗利（{selectedReturnRate * 100}%還元）
+                    </p>
+                    <p
+                      className={`text-xs font-extrabold tabular-nums ${
+                        m.grossProfit < 0 ? 'text-slate-500' : 'text-emerald-700'
+                      }`}
+                    >
+                      {formatCurrency(m.grossProfit)}
+                    </p>
                   </div>
                   <div className="px-2 py-2">
                     <p className="text-[9px] text-slate-400">面談移行率</p>
