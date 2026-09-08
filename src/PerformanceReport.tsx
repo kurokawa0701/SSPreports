@@ -665,7 +665,6 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         {/* 還元率別の実質粗利と対効果 */}
         <section className="print-section p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-1">還元率別の実質粗利と対効果</h2>
-          <p className="text-xs text-slate-400 mb-3 print:hidden">還元率ごとの比較表です（下部の要員別詳細データとは連動しません）</p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-white text-slate-500 font-medium">
