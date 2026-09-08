@@ -14,7 +14,7 @@ import {
   OFFER_RATE_GOOD_THRESHOLD,
   buildActionPlan,
   buildAutoHeadline,
-  buildDiagnosisCopyText,
+  buildOverallDiagnosisSummary,
   diagnoseMember,
   evaluateAbove,
   getActionRecommendation,
@@ -199,8 +199,16 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     ? data.actionPlanText.split('\n').map((s) => s.trim()).filter(Boolean)
     : calculatedData.actionPlan;
 
-  // 「全体診断（コピペ用）」の自動生成テキスト
-  const autoDiagnosisSummaryText = buildDiagnosisCopyText(calculatedData.diagnosisGroups);
+  // 「全体診断（コピペ用）」の自動生成テキスト。要員別診断カードと内容が重複しないよう、
+  // 個々のコメントを列挙するのではなく、実績サマリー・診断内訳・今後の対策に絞った総括文にしている。
+  const autoDiagnosisSummaryText = buildOverallDiagnosisSummary(
+    {
+      totalProposals: calculatedData.totalProposals,
+      totalInterviews: calculatedData.totalInterviews,
+      totalOffers: calculatedData.totalOffers,
+    },
+    calculatedData.diagnosisGroups
+  );
   const displayedDiagnosisSummaryText = data.diagnosisSummaryText?.trim()
     ? data.diagnosisSummaryText
     : autoDiagnosisSummaryText;
@@ -986,26 +994,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   </button>
                 )}
               </>
-            ) : data.diagnosisSummaryText?.trim() ? (
-              <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto print:max-h-none print:overflow-visible">
-                {data.diagnosisSummaryText}
-              </p>
             ) : (
-              <div className="space-y-3 text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto print:max-h-none print:overflow-visible">
-                {calculatedData.diagnosisGroups.map((group) => (
-                  <div key={group.label}>
-                    <p className={`inline-block px-2 py-0.5 rounded-full font-semibold mb-1 ${toneBadgeClasses(group.tone)}`}>
-                      {group.label}
-                    </p>
-                    {group.entries.map((entry) => (
-                      <p key={entry.name}>
-                        <span className="font-semibold text-slate-800">【{entry.name}】：</span>
-                        {entry.comment}
-                      </p>
-                    ))}
-                  </div>
-                ))}
-              </div>
+              <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto print:max-h-none print:overflow-visible">
+                {displayedDiagnosisSummaryText}
+              </p>
             )}
           </div>
         </section>

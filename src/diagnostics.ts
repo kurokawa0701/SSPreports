@@ -259,12 +259,31 @@ export function groupDiagnoses(
   return order.map((key) => groups.get(key)!);
 }
 
-/** 「全体診断（コピペ用）」セクションの中身を、クリップボードコピー用のプレーンテキストに整形する */
-export function buildDiagnosisCopyText(groups: DiagnosisGroup[]): string {
-  return groups
-    .map((group) => {
-      const lines = group.entries.map((entry) => `【${entry.name}】：${entry.comment}`);
-      return [`【${group.label}】`, ...lines].join('\n');
-    })
-    .join('\n\n');
+/**
+ * 「全体診断（コピペ用）」セクションの中身を、チーム全体の総括テキストとして組み立てる。
+ * 以前は要員別診断カードやコピー用リストで既に見せている「要員ごとのコメント」をそのまま列挙していたため、
+ * 個別診断と内容が丸ごと重複していた。ここでは重複を避け、実績サマリー・診断内訳（人数）・
+ * 今後の対策の3点に絞った、社外に送っても読みやすい総括文を自動生成する。
+ */
+export function buildOverallDiagnosisSummary(totals: OverallTotals, groups: DiagnosisGroup[]): string {
+  const { totalProposals, totalInterviews, totalOffers } = totals;
+
+  if (totalProposals === 0 || groups.length === 0) {
+    return '提案実績がまだありません。要員データを入力すると、実績に応じた総括がここに自動生成されます。';
+  }
+
+  const interviewRate = totalInterviews / totalProposals;
+  const offerRate = totalInterviews > 0 ? totalOffers / totalInterviews : 0;
+  const memberCount = groups.reduce((sum, g) => sum + g.entries.length, 0);
+
+  const overview = `対象要員${memberCount}名（提案${totalProposals}社・面談${totalInterviews}社・オファー${totalOffers}社、面談移行率${pct(interviewRate)}・オファー獲得率${pct(offerRate)}）。`;
+
+  const breakdown = groups
+    .map((g) => `・${g.label}：${g.entries.length}名（${g.entries.map((e) => e.name).join('、')}）`)
+    .join('\n');
+
+  const actionPlan = buildActionPlan(groups);
+  const actionText = actionPlan.map((a, i) => `${i + 1}. ${a}`).join('\n');
+
+  return [overview, `【診断内訳】\n${breakdown}`, `【今後の対策】\n${actionText}`].join('\n\n');
 }
