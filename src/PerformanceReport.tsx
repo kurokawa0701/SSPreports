@@ -198,7 +198,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   // --- 編集ハンドラ ---
   const updateHeaderField = (
     patch: Partial<
-      Pick<ReportSummaryData, 'clientName' | 'period' | 'headline' | 'actionPlanText' | 'diagnosisSummaryText'>
+      Pick<
+        ReportSummaryData,
+        'clientName' | 'period' | 'headline' | 'actionPlanText' | 'diagnosisSummaryText' | 'providerName'
+      >
     >
   ) => {
     setData((prev) => ({ ...prev, ...patch }));
@@ -296,18 +299,40 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   };
 
   const handleDownloadPdf = () => {
-    window.print();
+    // 編集中に印刷すると入力欄がそのまま印刷されてしまうため、
+    // 印刷前に必ず編集モードを終了し、整形済みの表示に切り替えてから印刷する。
+    if (isEditing) {
+      setIsEditing(false);
+      // setIsEditingの反映（再描画）を待ってから印刷ダイアログを開く
+      requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+    } else {
+      window.print();
+    }
   };
 
   const hasMembers = calculatedData.memberCalculations.length > 0;
 
   return (
-    <div className="max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none">
+    <div className="max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none print:max-w-none print:p-0">
+      {/* 表紙（PDF/印刷時のみ表示。社外提出を想定した1枚目） */}
+      <div className="hidden print:flex print:flex-col print:items-center print:justify-center print:text-center print:min-h-[240mm] print:break-after-page">
+        <span className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-slate-900 text-white text-4xl font-bold mb-8">
+          {getClientInitial(data.clientName)}
+        </span>
+        <p className="text-xs font-bold tracking-[0.3em] text-slate-400 mb-4">SSP（SES）REPORT</p>
+        <h1 className="text-3xl font-extrabold text-slate-900 mb-3">{data.clientName || '顧客名未設定'} 様</h1>
+        <p className="text-base text-slate-500 mb-12">SSP（SES）レポート</p>
+        <div className="text-sm text-slate-500 space-y-2">
+          <p>対象期間：{data.period || '未設定'}</p>
+          {data.providerName?.trim() && <p>作成：{data.providerName}</p>}
+        </div>
+      </div>
+
       {/* ヘッダー */}
-      <header className="border-b border-slate-100 pb-6">
+      <header className="border-b border-slate-100 pb-6 print:pb-3 print:border-slate-300">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="inline-flex items-center justify-center shrink-0 w-14 h-14 rounded-xl bg-slate-900 text-white text-2xl font-bold">
+            <span className="inline-flex items-center justify-center shrink-0 w-14 h-14 rounded-xl bg-slate-900 text-white text-2xl font-bold print:hidden">
               {getClientInitial(data.clientName)}
             </span>
             <div className="min-w-0">
@@ -347,13 +372,24 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           {isEditing ? (
-            <input
-              className="text-sm font-semibold rounded-full bg-slate-50 text-slate-600 border border-slate-200 px-3 py-1 text-right"
-              value={data.period}
-              onChange={(e) => updateHeaderField({ period: e.target.value })}
-            />
+            <>
+              <label className="flex items-center gap-1.5 text-xs text-slate-400 print:hidden">
+                作成会社名（表紙用）
+                <input
+                  className="text-sm font-medium rounded-full bg-white text-slate-600 border border-slate-200 px-3 py-1"
+                  placeholder="例）株式会社◯◯"
+                  value={data.providerName ?? ''}
+                  onChange={(e) => updateHeaderField({ providerName: e.target.value })}
+                />
+              </label>
+              <input
+                className="text-sm font-semibold rounded-full bg-slate-50 text-slate-600 border border-slate-200 px-3 py-1 text-right"
+                value={data.period}
+                onChange={(e) => updateHeaderField({ period: e.target.value })}
+              />
+            </>
           ) : (
             <p className="px-3 py-1 text-sm font-semibold rounded-full bg-slate-50 text-slate-600 border border-slate-100">
               {data.period}
@@ -468,7 +504,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       {/* サマリー: 2x2クアドラント */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 全体実績 */}
-        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:break-inside-avoid">
+        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-4">全体実績</h2>
           <div className="flex flex-col gap-3.5">
             <div className="p-5 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100 text-center">
@@ -504,7 +540,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         </section>
 
         {/* ファネル分析 */}
-        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:break-inside-avoid flex flex-col">
+        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col">
           <h2 className="text-lg font-bold mb-4">ファネル分析</h2>
           {hasMembers ? (
             <div className="flex-1 flex flex-col justify-center">
@@ -590,7 +626,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         </section>
 
         {/* 還元率別の想定粗利と対効果 */}
-        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:break-inside-avoid">
+        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-1">還元率別の想定粗利と対効果</h2>
           <p className="text-xs text-slate-400 mb-3 print:hidden">行をクリックすると下部の還元率が切り替わります</p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -632,7 +668,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         </section>
 
         {/* 要員別診断と今後の対策 */}
-        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:break-inside-avoid">
+        <section className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-4">要員別診断と今後の対策</h2>
           {hasMembers ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -686,7 +722,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       </div>
 
       {/* 要員別診断 & ファネル図 */}
-      <section className="space-y-8 print:break-inside-avoid">
+      <section className="space-y-8 print:break-before-page">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3">要員別詳細データ</h2>
           <div className="flex items-center gap-3 print:hidden">
@@ -735,7 +771,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {calculatedData.memberCalculations.map((m, idx) => (
-                  <tr key={m.id} className={idx % 2 === 0 ? '' : 'bg-slate-50/20'}>
+                  <tr key={m.id} className={`print:break-inside-avoid ${idx % 2 === 0 ? '' : 'bg-slate-50/20'}`}>
                     <td className="p-4 font-mono text-xs text-slate-400">{idx + 1}</td>
                     <td className="p-4 font-semibold">
                       {isEditing ? (
@@ -838,7 +874,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
 
       {/* 診断コピペ用まとめ */}
       {hasMembers && (
-        <section className="space-y-4 print:break-inside-avoid">
+        <section className="space-y-4 print:break-before-page">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3">全体診断（コピペ用）</h2>
             <button
@@ -873,11 +909,11 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 )}
               </>
             ) : data.diagnosisSummaryText?.trim() ? (
-              <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto">
+              <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto print:max-h-none print:overflow-visible">
                 {data.diagnosisSummaryText}
               </p>
             ) : (
-              <div className="space-y-3 text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto">
+              <div className="space-y-3 text-xs leading-relaxed text-slate-600 p-4 rounded-xl border border-dashed border-slate-200 max-h-80 overflow-y-auto print:max-h-none print:overflow-visible">
                 {calculatedData.diagnosisGroups.map((group) => (
                   <div key={group.label}>
                     <p className={`inline-block px-2 py-0.5 rounded-full font-semibold mb-1 ${toneBadgeClasses(group.tone)}`}>

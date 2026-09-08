@@ -19,6 +19,8 @@ export interface ReportSummaryData {
   actionPlanText?: string;
   // 「全体診断（コピペ用）」の自由編集テキスト。空/未入力なら診断結果から自動生成した内容を表示する。
   diagnosisSummaryText?: string;
+  // レポート作成会社名（表紙ページに表示。社外提出用のPDFを想定）
+  providerName?: string;
 }
 
 // 還元率別損益シミュレーションの選択肢 (60% / 70% / 80%)
