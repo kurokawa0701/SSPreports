@@ -1,5 +1,7 @@
 // PerformanceReport.tsx
 import { useMemo, useRef, useState } from 'react';
+// レポート作成元（自社）のロゴ。顧客企業によらず、どのレポートでも同じロゴを表示する。
+import providerLogoUrl from './assets/neighbor-engineers-logo.png';
 import type { ChangeEvent, DragEvent } from 'react';
 import type {
   Diagnosis,
@@ -47,17 +49,6 @@ const RETURN_RATE_OPTIONS: ReturnRateOption[] = [
 // 元のExcelレポート（SSPレポートテンプレート）の計算方法に合わせている。
 const COST_EFFECTIVENESS_BASELINE = 350000;
 
-// ヘッダーのロゴに使う頭文字を決めるための、法人格などの一般的な接頭辞・接尾辞。
-// これを取り除かないと「株式会社◯◯」のような会社名が軒並み「株」になってしまう。
-const COMPANY_AFFIX_PATTERN =
-  /(株式会社|有限会社|合同会社|合資会社|合名会社|一般社団法人|一般財団法人|公益社団法人|公益財団法人|医療法人|特定非営利活動法人|\(株\)|（株）|\(有\)|（有）)/g;
-
-function getClientInitial(clientName: string): string {
-  const trimmed = clientName.trim();
-  if (!trimmed) return '?';
-  const core = trimmed.replace(COMPANY_AFFIX_PATTERN, '').trim();
-  return (core || trimmed).charAt(0).toUpperCase();
-}
 
 function createEmptyMember(index: number): MemberData {
   return {
@@ -343,9 +334,11 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     <div className="max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none print:max-w-none print:p-0 print:space-y-6">
       {/* 表紙（PDF/印刷時のみ表示。社外提出を想定した1枚目） */}
       <div className="hidden print:flex print:flex-col print:items-center print:justify-center print:text-center print:min-h-[240mm] print:break-after-page">
-        <span className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-slate-900 text-white text-4xl font-bold mb-8">
-          {getClientInitial(data.clientName)}
-        </span>
+        <img
+          src={providerLogoUrl}
+          alt="Neighbor Engineers"
+          className="w-44 h-auto mb-10"
+        />
         <p className="text-xs font-bold tracking-[0.3em] text-slate-400 mb-4">SSP（SES）REPORT</p>
         <h1 className="text-3xl font-extrabold text-slate-900 mb-3">{data.clientName || '顧客名未設定'} 様</h1>
         <p className="text-base text-slate-500 mb-12">SSP（SES）レポート</p>
@@ -359,9 +352,11 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       <header className="border-b border-slate-100 pb-6 print:pb-3 print:border-slate-300">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="inline-flex items-center justify-center shrink-0 w-14 h-14 rounded-xl bg-slate-900 text-white text-2xl font-bold print:hidden">
-              {getClientInitial(data.clientName)}
-            </span>
+            <img
+              src={providerLogoUrl}
+              alt="Neighbor Engineers"
+              className="shrink-0 h-14 w-auto print:hidden"
+            />
             <div className="min-w-0">
               {isEditing ? (
                 <input

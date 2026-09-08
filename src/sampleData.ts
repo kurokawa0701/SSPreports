@@ -7,7 +7,9 @@ import type { ReportSummaryData } from './types';
 export const sampleReportData: ReportSummaryData = {
   clientName: '株式会社ネイバーズ',
   period: '2026.7.x - 2026.8.x',
-  headline: '強力なパイプライン形成により高い面談移行率 (95.2%) を達成するも、オファー獲得 (2.5%) に課題。要員ごとのピンポイントな戦略的介入が必要。',
+  // 空にしておくと、実際の集計結果から buildAutoHeadline が要約を自動生成する。
+  // 固定文を入れると、下のmembersを変更したときに数値が食い違ってしまうため空にしている。
+  headline: '',
   members: [
     {
       id: '1',
