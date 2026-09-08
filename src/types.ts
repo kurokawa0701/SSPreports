@@ -8,6 +8,10 @@ export interface MemberData {
   interviews: number;    // 面談数
   offers: number;        // オファー数
   unitPrice: number;     // オファー単価
+  casePoolSize?: number; // 案件母数（紹介可能だった案件の総数。任意項目）
+  closeReason?: string;  // 営業終了理由（オファーに至らず終了した場合の理由。任意項目）
+  // 要員ごとの「今後の対策」の自由編集テキスト。空/未入力なら診断ラベルから自動生成した内容を表示する。
+  actionNote?: string;
 }
 
 export interface ReportSummaryData {

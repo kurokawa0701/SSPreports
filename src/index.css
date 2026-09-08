@@ -14,4 +14,11 @@
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
+
+  /* 要員別詳細データの表は列数が多いため、印刷時は余白・文字サイズを詰めて用紙幅に収める */
+  .member-detail-table th,
+  .member-detail-table td {
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+  }
 }

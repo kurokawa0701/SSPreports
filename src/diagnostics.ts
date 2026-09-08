@@ -26,85 +26,96 @@ export const INTERVIEW_RATE_SEVERE_THRESHOLD = 0.3;
 
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
 
+/**
+ * 案件母数（casePoolSize）が入力されている場合、提案消化率をコメント末尾に補足する。
+ * 「紹介できる案件はあるのに提案数が少ない」といった、提案数だけでは見えない状況を反映する。
+ */
+function appendCaseContext(comment: string, m: MemberData): string {
+  if (!m.casePoolSize || m.casePoolSize <= 0) return comment;
+  const rate = m.proposals / m.casePoolSize;
+  return `${comment}（案件母数${m.casePoolSize}件中${m.proposals}件へ提案・消化率${pct(rate)}）`;
+}
+
+/**
+ * 営業終了理由（closeReason）が入力されている場合、コメント末尾に補足する。
+ * オファーに至らず終了したケースでは、推測ではなく実際の終了理由を診断に反映する。
+ * すでにオファーが出ている（成約）ケースでは終了理由は付けない。
+ */
+function appendCloseReason(comment: string, m: MemberData): string {
+  if (m.offers > 0) return comment;
+  const reason = m.closeReason?.trim();
+  if (!reason) return comment;
+  return `${comment}（終了理由：${reason}）`;
+}
+
 export function diagnoseMember(m: MemberData): Diagnosis {
+  const finalize = (d: Diagnosis): Diagnosis => ({
+    ...d,
+    comment: appendCloseReason(appendCaseContext(d.comment, m), m),
+  });
+
   if (m.proposals === 0) {
-    return {
+    return finalize({
       tone: 'neutral',
       label: '提案未実施',
       comment: 'まだ提案実績がありません。',
-    };
+    });
   }
 
   if (m.proposals < MIN_SAMPLE_PROPOSALS) {
-    return {
+    return finalize({
       tone: 'neutral',
       label: '判断材料不足',
       comment: `提案数が${m.proposals}社とまだ少なく、傾向を判断する材料が不足。提案を継続して様子を見る。`,
-    };
+    });
   }
 
   const interviewRate = m.interviews / m.proposals;
   const offerRate = m.interviews > 0 ? m.offers / m.interviews : 0;
 
-  // 1. 面談からのオファー転換が良好 → 実績ベースで最優先の高評価
-  if (m.offers > 0 && offerRate >= OFFER_RATE_GOOD_THRESHOLD) {
-    return {
+  // 1. オファーが1件でもあれば、その時点で営業活動は完了（成約）とみなし最優先の高評価とする。
+  //    オファーからの転換率の高低は、営業終了後の指標のため評価には使わない。
+  if (m.offers > 0) {
+    return finalize({
       tone: 'success',
       label: 'スキル・面談力OK',
-      comment: `提案${m.proposals}社・面談${m.interviews}社・オファー${m.offers}社。面談からのオファー転換率が${pct(offerRate)}と良好。現状のスキルで案件にマッチしているため、引き続き案件提案を行っていく。`,
-    };
+      comment: `提案${m.proposals}社・面談${m.interviews}社・オファー${m.offers}社（オファー転換率${pct(offerRate)}）を獲得し、営業活動は完了。現状のスキルで案件にマッチしているため、引き続き同様の提案を行っていく。`,
+    });
   }
 
   // 2. 面談が1件も獲得できていない → 提案先とのミスマッチの疑いが最も強いケース
   if (m.interviews === 0) {
-    return {
+    return finalize({
       tone: 'warning',
       label: '面談未獲得',
       comment: `提案${m.proposals}社に対して面談0社。提案先の選定・アプローチ内容のミスマッチが強く疑われるため、早急に提案先を見直す。`,
-    };
+    });
   }
 
   // 3. 面談移行率が著しく低い（severeしきい値未満）→ 明確な提案先ミスマッチ
   if (interviewRate < INTERVIEW_RATE_SEVERE_THRESHOLD) {
-    return {
+    return finalize({
       tone: 'warning',
       label: '提案先ミスマッチ',
       comment: `提案${m.proposals}社に対して面談${m.interviews}社（面談移行率${pct(interviewRate)}）と低調。提案先とのミスマッチが考えられるため、提案先を再検討。`,
-    };
+    });
   }
 
   // 4. 面談移行率がやや低い（severeしきい値〜lowしきい値）→ 致命的ではないが改善余地あり
   if (interviewRate < INTERVIEW_RATE_LOW_THRESHOLD) {
-    return {
+    return finalize({
       tone: 'info',
       label: '提案精度に改善余地',
       comment: `提案${m.proposals}社に対して面談${m.interviews}社（面談移行率${pct(interviewRate)}）。致命的な水準ではないが、提案先の絞り込みでさらなる改善が期待できる。`,
-    };
+    });
   }
 
-  // 5. 面談は取れているがオファーが1件もない → スキル・経歴面のアンマッチ
-  if (m.offers === 0) {
-    return {
-      tone: 'info',
-      label: 'スキルアンマッチ',
-      comment: `面談${m.interviews}社（面談移行率${pct(interviewRate)}）まで進めているものの、オファー0社。スキルアンマッチ・経歴相違・面談スキル・案件選定を再検討。`,
-    };
-  }
-
-  // 6. 面談・オファーとも一定数あるが、オファー転換率が基準未満
-  if (m.offers > 0) {
-    return {
-      tone: 'neutral',
-      label: 'オファー転換に伸びしろ',
-      comment: `提案${m.proposals}社・面談${m.interviews}社・オファー${m.offers}社（オファー転換率${pct(offerRate)}）。面談後の訴求内容を見直すことで、オファー獲得率のさらなる改善が期待できる。`,
-    };
-  }
-
-  return {
-    tone: 'neutral',
-    label: '傾向を注視',
-    comment: `提案${m.proposals}社・面談${m.interviews}社・オファー${m.offers}社。傾向を継続観察。`,
-  };
+  // 5. 面談は十分に取れているがオファーが1件もない → スキル・経歴面のアンマッチ
+  return finalize({
+    tone: 'info',
+    label: 'スキルアンマッチ',
+    comment: `面談${m.interviews}社（面談移行率${pct(interviewRate)}）まで進めているものの、オファー0社。スキルアンマッチ・経歴相違・面談スキル・案件選定を再検討。`,
+  });
 }
 
 export interface OverallTotals {
@@ -200,11 +211,14 @@ export const ACTION_RECOMMENDATIONS: Record<string, string> = {
   '提案先ミスマッチ': '提案先の選定見直し：ターゲット業界・案件レイヤーを再検討し、提案の精度を高める。',
   '提案精度に改善余地': '提案先の絞り込み：致命的ではないが、より要員のスキル・志向に合った案件への絞り込みで面談移行率の改善を狙う。',
   'スキルアンマッチ': '面談対策の強化：面談には進むもののオファーに至らないため、スキルシートや訴求内容を見直す。',
-  'オファー転換に伸びしろ': '面談後の訴求強化：面談・オファーとも実績はあるため、面談時の訴求内容やクロージングを見直し転換率を高める。',
   '判断材料不足': '提案数の底上げ：まずは提案数を増やし、傾向を判断できるだけのデータを蓄積する。',
   '提案未実施': '提案の開始：対象案件の選定と提案活動をまず開始する。',
-  '傾向を注視': '継続観察：現状のペースを維持しつつ、次回以降の推移を確認する。',
 };
+
+/** 診断ラベル1件分の推奨アクション文を返す（要員別詳細データの「今後の対策」列で使う） */
+export function getActionRecommendation(label: string): string {
+  return ACTION_RECOMMENDATIONS[label] ?? `${label}：状況を確認し、必要な対策を検討する。`;
+}
 
 /** 実際に発生している診断ラベルの分だけ、重複なく対策リストを組み立てる */
 export function buildActionPlan(groups: { label: string }[]): string[] {
@@ -213,7 +227,7 @@ export function buildActionPlan(groups: { label: string }[]): string[] {
   for (const g of groups) {
     if (seen.has(g.label)) continue;
     seen.add(g.label);
-    plan.push(ACTION_RECOMMENDATIONS[g.label] ?? `${g.label}：状況を確認し、必要な対策を検討する。`);
+    plan.push(getActionRecommendation(g.label));
   }
   return plan;
 }

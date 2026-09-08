@@ -16,6 +16,7 @@ import {
   buildDiagnosisCopyText,
   diagnoseMember,
   evaluateAbove,
+  getActionRecommendation,
   groupDiagnoses,
   toneBadgeClasses,
   toneCardClasses,
@@ -754,7 +755,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-inner">
-            <table className="w-full text-sm">
+            <table className="member-detail-table w-full text-sm">
               <thead className="bg-slate-50 text-slate-600 font-medium">
                 <tr>
                   <th className="p-4 text-left">要員ID</th>
@@ -764,8 +765,11 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   <th className="p-4 text-center">面談移行率</th>
                   <th className="p-4 text-center">面談社数</th>
                   <th className="p-4 text-center">オファー社数</th>
+                  <th className="p-4 text-center print:hidden">案件母数</th>
+                  <th className="p-4 text-left print:hidden">営業終了理由</th>
                   <th className="p-4 text-right">粗利額（{selectedReturnRate * 100}%還元）</th>
-                  <th className="p-4 text-center">診断結果</th>
+                  <th className="p-4 text-left">診断結果</th>
+                  <th className="p-4 text-left">今後の対策</th>
                   {isEditing && <th className="p-4 text-center print:hidden">操作</th>}
                 </tr>
               </thead>
@@ -835,11 +839,55 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                         m.offers
                       )}
                     </td>
+                    <td className="p-4 text-center print:hidden">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          className="w-16 rounded border border-slate-200 px-2 py-1 text-center"
+                          placeholder="任意"
+                          value={m.casePoolSize ?? ''}
+                          onChange={(e) =>
+                            updateMember(m.id, {
+                              casePoolSize: e.target.value === '' ? undefined : Number(e.target.value),
+                            })
+                          }
+                        />
+                      ) : (
+                        (m.casePoolSize ?? '－')
+                      )}
+                    </td>
+                    <td className="p-4 text-left print:hidden">
+                      {isEditing ? (
+                        <input
+                          className="w-32 rounded border border-slate-200 px-2 py-1"
+                          placeholder="任意（例：条件不一致）"
+                          value={m.closeReason ?? ''}
+                          onChange={(e) => updateMember(m.id, { closeReason: e.target.value })}
+                        />
+                      ) : (
+                        (m.closeReason || '－')
+                      )}
+                    </td>
                     <td className="p-4 text-right font-bold text-indigo-700 tabular-nums">{formatCurrency(m.grossProfit)}</td>
-                    <td className="p-4 text-center">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${toneBadgeClasses(m.diagnosis.tone)}`}>
+                    <td className="p-4 text-left align-top">
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${toneBadgeClasses(m.diagnosis.tone)}`}>
                         {m.diagnosis.label}
                       </span>
+                      <p className="mt-1.5 text-xs leading-relaxed text-slate-500 max-w-xs print:max-w-[160px]">{m.diagnosis.comment}</p>
+                    </td>
+                    <td className="p-4 text-left align-top">
+                      {isEditing ? (
+                        <textarea
+                          className="w-56 rounded border border-slate-200 px-2 py-1 text-xs leading-relaxed"
+                          rows={3}
+                          value={m.actionNote?.trim() ? m.actionNote : getActionRecommendation(m.diagnosis.label)}
+                          onChange={(e) => updateMember(m.id, { actionNote: e.target.value })}
+                        />
+                      ) : (
+                        <p className="text-xs leading-relaxed text-slate-600 max-w-xs print:max-w-[160px]">
+                          {m.actionNote?.trim() ? m.actionNote : getActionRecommendation(m.diagnosis.label)}
+                        </p>
+                      )}
                     </td>
                     {isEditing && (
                       <td className="p-4 text-center print:hidden">

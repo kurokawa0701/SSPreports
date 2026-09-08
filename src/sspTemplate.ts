@@ -11,6 +11,7 @@
 //   面談数 |    |     1 |     1 |     3 | ...
 //
 // 面談移行率・オファー獲得率の行は自前で計算し直すため読み飛ばす。
+// 「案件母数」「営業終了理由」の行がある場合は任意項目として読み込む（無くてもエラーにはならない）。
 
 import type { MemberData } from './types';
 import type { CsvImportResult, ImportRow } from './csv';
@@ -30,14 +31,21 @@ export function looksLikeSspTemplate(rows: ImportRow[]): boolean {
   return rows.some((row) => cellToString(row[0]) === '要員別');
 }
 
-type MetricKey = 'proposals' | 'interviews' | 'offers' | 'unitPrice';
+type NumericMetricKey = 'proposals' | 'interviews' | 'offers' | 'unitPrice' | 'casePoolSize';
+type StringMetricKey = 'closeReason';
 
-function matchMetricKey(label: string): MetricKey | null {
+function matchNumericMetricKey(label: string): NumericMetricKey | null {
   if (label.includes('提案数')) return 'proposals';
   if (label.includes('面談数')) return 'interviews';
   if (label.includes('オファー数')) return 'offers';
   if (label.includes('単価')) return 'unitPrice';
+  if (label.includes('案件母数')) return 'casePoolSize';
   return null; // 面談移行率・オファー獲得率などは計算し直すのでスキップ
+}
+
+function matchStringMetricKey(label: string): StringMetricKey | null {
+  if (label.includes('終了理由')) return 'closeReason';
+  return null;
 }
 
 export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
@@ -85,11 +93,15 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
     return { members: [], errors: ['要員名を読み取れませんでした。'], clientName, period };
   }
 
-  const values: Record<MetricKey, Record<number, number>> = {
+  const values: Record<NumericMetricKey, Record<number, number>> = {
     proposals: {},
     interviews: {},
     offers: {},
     unitPrice: {},
+    casePoolSize: {},
+  };
+  const stringValues: Record<StringMetricKey, Record<number, string>> = {
+    closeReason: {},
   };
 
   for (let r = nameRowIndex + 1; r < rows.length; r++) {
@@ -97,23 +109,38 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
     const label = cellToString(row[0]);
     if (!label) continue;
 
-    const key = matchMetricKey(label);
-    if (!key) continue;
+    const numericKey = matchNumericMetricKey(label);
+    if (numericKey) {
+      for (const { colIndex } of memberColumns) {
+        const n = cellToNumber(row[colIndex]);
+        if (n !== null) values[numericKey][colIndex] = n;
+      }
+      continue;
+    }
 
-    for (const { colIndex } of memberColumns) {
-      const n = cellToNumber(row[colIndex]);
-      if (n !== null) values[key][colIndex] = n;
+    const stringKey = matchStringMetricKey(label);
+    if (stringKey) {
+      for (const { colIndex } of memberColumns) {
+        const s = cellToString(row[colIndex]);
+        if (s) stringValues[stringKey][colIndex] = s;
+      }
     }
   }
 
-  const members: MemberData[] = memberColumns.map(({ colIndex, name }, idx) => ({
-    id: `${Date.now()}-${idx}`,
-    name,
-    proposals: values.proposals[colIndex] ?? 0,
-    interviews: values.interviews[colIndex] ?? 0,
-    offers: values.offers[colIndex] ?? 0,
-    unitPrice: values.unitPrice[colIndex] ?? 0,
-  }));
+  const members: MemberData[] = memberColumns.map(({ colIndex, name }, idx) => {
+    const casePoolSize = values.casePoolSize[colIndex];
+    const closeReason = stringValues.closeReason[colIndex];
+    return {
+      id: `${Date.now()}-${idx}`,
+      name,
+      proposals: values.proposals[colIndex] ?? 0,
+      interviews: values.interviews[colIndex] ?? 0,
+      offers: values.offers[colIndex] ?? 0,
+      unitPrice: values.unitPrice[colIndex] ?? 0,
+      ...(casePoolSize !== undefined ? { casePoolSize } : {}),
+      ...(closeReason !== undefined ? { closeReason } : {}),
+    };
+  });
 
   return { members, errors: [], clientName, period };
 }
