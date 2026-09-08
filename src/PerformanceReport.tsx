@@ -384,8 +384,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               <textarea
                 className="mt-2 block w-full rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 text-sm leading-relaxed text-slate-900"
                 rows={3}
-                placeholder={autoHeadline}
-                value={data.headline}
+                value={data.headline.trim() ? data.headline : autoHeadline}
                 onChange={(e) => updateHeaderField({ headline: e.target.value })}
               />
             ) : (
@@ -651,8 +650,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                     <textarea
                       className="block w-full rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 text-xs leading-relaxed text-slate-900"
                       rows={6}
-                      placeholder={autoActionPlanText}
-                      value={data.actionPlanText ?? ''}
+                      value={data.actionPlanText?.trim() ? data.actionPlanText : autoActionPlanText}
                       onChange={(e) => updateHeaderField({ actionPlanText: e.target.value })}
                     />
                     {data.actionPlanText?.trim() && (
@@ -861,8 +859,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 <textarea
                   className="block w-full rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 text-xs leading-relaxed text-slate-900"
                   rows={10}
-                  placeholder={autoDiagnosisSummaryText}
-                  value={data.diagnosisSummaryText ?? ''}
+                  value={data.diagnosisSummaryText?.trim() ? data.diagnosisSummaryText : autoDiagnosisSummaryText}
                   onChange={(e) => updateHeaderField({ diagnosisSummaryText: e.target.value })}
                 />
                 {data.diagnosisSummaryText?.trim() && (
