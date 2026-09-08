@@ -109,15 +109,18 @@ export function buildAutoHeadline(totals: OverallTotals): string {
 }
 
 export function toneBadgeClasses(tone: DiagnosisToneLike): string {
+  // whitespace-nowrap: 日本語は単語間にスペースがないため、幅の狭いセル内では
+  // 文字の途中で改行されてしまう（例:「スキルアンマッチ」の「チ」だけ次行に落ちる）。
+  // バッジは折り返さず1行で表示する。
   switch (tone) {
     case 'success':
-      return 'bg-green-50 text-green-800 border border-green-200';
+      return 'whitespace-nowrap bg-green-50 text-green-800 border border-green-200';
     case 'warning':
-      return 'bg-amber-50 text-amber-800 border border-amber-200';
+      return 'whitespace-nowrap bg-amber-50 text-amber-800 border border-amber-200';
     case 'info':
-      return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+      return 'whitespace-nowrap bg-indigo-50 text-indigo-700 border border-indigo-200';
     default:
-      return 'bg-slate-100 text-slate-600 border border-slate-200';
+      return 'whitespace-nowrap bg-slate-100 text-slate-600 border border-slate-200';
   }
 }
 
