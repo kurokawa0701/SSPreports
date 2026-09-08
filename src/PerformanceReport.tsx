@@ -75,6 +75,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [pendingSheets, setPendingSheets] = useState<Extract<PreparedImport, { kind: 'excel-multi' }> | null>(null);
   const [copied, setCopied] = useState(false);
+  // 印刷/PDF出力時に、主要セクションをそれぞれ新しいページから始めるかどうか。
+  // 紙に印刷して配布する場合はセクションが混ざらない方が読みやすく、
+  // メールでPDFを送るだけの場合はページ数を抑えたい、という二つの使い方があるため切り替え可能にしている。
+  const [sectionPerPage, setSectionPerPage] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -331,7 +335,11 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   const hasMembers = calculatedData.memberCalculations.length > 0;
 
   return (
-    <div className="max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none print:max-w-none print:p-0 print:space-y-4">
+    <div
+      className={`max-w-[1200px] mx-auto p-6 bg-white shadow-lg rounded-xl space-y-8 font-sans text-slate-900 border border-slate-100 print:shadow-none print:border-0 print:rounded-none print:max-w-none print:p-0 print:space-y-4 ${
+        sectionPerPage ? 'section-per-page' : ''
+      }`}
+    >
       {/* 表紙（PDF/印刷時のみ表示。社外提出を想定した1枚目） */}
       <div className="hidden print:flex print:flex-col print:items-center print:justify-center print:text-center print:min-h-[240mm] print:break-after-page">
         <img
@@ -526,7 +534,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       </header>
 
       {/* サマリー: 2x2クアドラント（印刷時は縦1列にして、A4縦表示でも読みやすくする） */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-1 print:gap-3">
+      <div className="print-quadrants grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-1 print:gap-3">
         {/* 全体実績 */}
         <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-4">全体実績</h2>
@@ -569,7 +577,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         </section>
 
         {/* ファネル分析 */}
-        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col">
+        <section className="print-section p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col">
           <h2 className="text-lg font-bold mb-4">ファネル分析</h2>
           {hasMembers ? (
             <div className="flex-1 flex flex-col justify-center">
@@ -655,7 +663,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         </section>
 
         {/* 還元率別の実質粗利と対効果 */}
-        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
+        <section className="print-section p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300 print:break-inside-avoid">
           <h2 className="text-lg font-bold mb-1">還元率別の実質粗利と対効果</h2>
           <p className="text-xs text-slate-400 mb-3 print:hidden">還元率ごとの比較表です（下部の要員別詳細データとは連動しません）</p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -690,7 +698,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
 
         {/* 要員別診断と今後の対策。要員数に応じて高さが変わるため、ブロック単位ではなく
             カード単位で改ページを避ける（ブロック全体をavoidにすると用紙下部が大きく空く） */}
-        <section className="p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300">
+        <section className="print-section p-6 print:p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300">
           <h2 className="text-lg font-bold mb-4 print:break-after-avoid">要員別診断と今後の対策</h2>
           {hasMembers ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -744,7 +752,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       </div>
 
       {/* 要員別診断 & ファネル図 */}
-      <section className="space-y-8 print:space-y-3">
+      <section className="print-section space-y-8 print:space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3 print:break-after-avoid">要員別詳細データ</h2>
           <div className="flex items-center gap-3 print:hidden">
@@ -1037,7 +1045,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
 
       {/* 診断コピペ用まとめ */}
       {hasMembers && (
-        <section className="space-y-4 print:space-y-2">
+        <section className="print-section space-y-4 print:space-y-2">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h2 className="text-xl font-bold border-l-4 border-indigo-600 pl-3 print:break-after-avoid">全体診断（コピペ用）</h2>
             <button
@@ -1081,7 +1089,16 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       )}
 
       {/* フッター */}
-      <footer className="border-t border-slate-100 pt-6 text-center print:hidden">
+      <footer className="border-t border-slate-100 pt-6 flex flex-col items-center gap-3 print:hidden">
+        <label className="flex items-center gap-2 text-sm text-slate-500 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={sectionPerPage}
+            onChange={(e) => setSectionPerPage(e.target.checked)}
+            className="w-4 h-4 accent-indigo-600"
+          />
+          セクションごとに改ページする（印刷して配布する場合におすすめ）
+        </label>
         <button
           type="button"
           onClick={handleDownloadPdf}

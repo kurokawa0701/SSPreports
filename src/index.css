@@ -15,6 +15,22 @@
     -webkit-print-color-adjust: exact;
   }
 
+  /* 「セクションごとに改ページする」がONのとき、主要セクションを新しいページから始める。
+     OFFのときは指定が付かないため、前ページの残りから続けて流れる（ページ数を抑えたい場合）。 */
+  .section-per-page .print-section {
+    break-before: page;
+  }
+
+  /* 4象限サマリーはgridで並んでいる。grid itemへのbreak-beforeはブラウザによって効かないため、
+     セクション区切りONのときだけ印刷時にblockレイアウトへ切り替える。 */
+  .section-per-page .print-quadrants {
+    display: block;
+  }
+
+  .section-per-page .print-quadrants > * + * {
+    margin-top: 0;
+  }
+
   /* 見出しだけが用紙の最下部に取り残されるのを防ぐ */
   h1,
   h2,
