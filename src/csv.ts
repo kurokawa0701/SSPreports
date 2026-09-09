@@ -1,13 +1,14 @@
 // csv.ts
 // 要員データをCSV/Excelから取り込むための共通パーサー。
 // 想定フォーマット: 氏名,提案数,面談数,オファー数,単価 (1行目はヘッダーでも可)
-// 6列目に営業終了理由、7列目に支援費、8列目に提案が伸びない要因、9列目に提案単価を追加すると、
-// それぞれ任意項目として読み込む
-// （どちらも省略可。列自体が無い/空でもエラーにはならず、支援費は未指定なら0として扱う）。
+// 6列目に営業終了理由、7列目に支援費、8列目に提案が伸びない要因、9列目に提案単価、
+// 10列目に営業開始日、11列目に営業終了日を追加すると、それぞれ任意項目として読み込む
+// （いずれも省略可。列自体が無い/空でもエラーにはならず、支援費は未指定なら0として扱う）。
 // CSVはクォート囲みや埋め込みカンマまでは対応していないシンプルな実装。
 // エクセルからのコピペ等、複雑な引用符を含むデータは事前に整形してから取り込むこと。
 
 import type { MemberData } from './types';
+import { normalizeDateInput } from './salesPeriod';
 
 export interface CsvImportResult {
   members: MemberData[];
@@ -79,6 +80,9 @@ export function parseMemberRows(rows: ImportRow[]): CsvImportResult {
       !Number.isNaN(Number(proposalUnitPriceRaw))
         ? Number(proposalUnitPriceRaw)
         : undefined;
+    // 営業開始日・営業終了日（任意）。Excel経由ならシリアル値で来ることもあるため正規化する。
+    const salesStartDate = normalizeDateInput(row[9]);
+    const salesEndDate = normalizeDateInput(row[10]);
     const supportFeeRaw = row[6];
     const supportFee =
       supportFeeRaw !== undefined && String(supportFeeRaw).trim() !== '' && !Number.isNaN(Number(supportFeeRaw))
@@ -96,6 +100,8 @@ export function parseMemberRows(rows: ImportRow[]): CsvImportResult {
       ...(closeReason !== undefined ? { closeReason } : {}),
       ...(proposalReason !== undefined ? { proposalReason } : {}),
       ...(proposalUnitPrice !== undefined ? { proposalUnitPrice } : {}),
+      ...(salesStartDate !== undefined ? { salesStartDate } : {}),
+      ...(salesEndDate !== undefined ? { salesEndDate } : {}),
     });
   }
 

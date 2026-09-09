@@ -24,6 +24,7 @@ import {
   toneBadgeClasses,
   toneCardClasses,
 } from './diagnostics';
+import { getSalesPeriodInfo, parseReportPeriod } from './salesPeriod';
 import type { CsvImportResult } from './csv';
 import type { PreparedImport } from './fileImport';
 import { ACCEPTED_FILE_EXTENSIONS, ACCEPTED_FILE_MIME_TYPES, prepareImport, readMembers } from './fileImport';
@@ -93,6 +94,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // レポート期間の自由入力から開始日・終了日を推定する。
+  // 要員の営業開始日／終了日と突き合わせて「通期で営業できたのか」を判定するために使う。
+  const reportPeriodRange = useMemo(() => parseReportPeriod(data.period), [data.period]);
+
   // --- 自動計算ロジック ---
   const calculatedData = useMemo(() => {
     // 売上として計上できるのはオファーを獲得した分だけ。オファー0件の要員に単価が入っていても
@@ -128,7 +133,10 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     // 実質粗利 = 売上単価 - 還元額（売上単価×還元率） - 支援費
     const memberCalculations: MemberCalculation[] = data.members.map((m) => {
       const grossProfit = wonUnitPrice(m) * (1 - selectedReturnRate) - m.supportFee;
-      const autoDiagnosis = diagnoseMember(m, { teamInterviewRate: teamInterviewRateForDiagnosis });
+      const autoDiagnosis = diagnoseMember(m, {
+        teamInterviewRate: teamInterviewRateForDiagnosis,
+        reportPeriod: reportPeriodRange,
+      });
       // 診断コメントはdiagnosisNoteで上書き可能（要員ごとに編集して送付できるようにするため）。
       // ラベル・トーン（分類）は自動診断のまま維持し、文章のみ差し替える。
       const diagnosis: Diagnosis = m.diagnosisNote?.trim()
@@ -136,6 +144,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
         : autoDiagnosis;
       return {
         ...m,
+        salesPeriod: getSalesPeriodInfo(m, reportPeriodRange),
         returnRate: selectedReturnRate * 100,
         baseCost: wonUnitPrice(m) * selectedReturnRate,
         grossProfit,
@@ -186,7 +195,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       interviewBarWidth,
       offerBarWidth,
     };
-  }, [data.members, selectedReturnRate]);
+  }, [data.members, selectedReturnRate, reportPeriodRange]);
 
   // 要約欄が未入力のときに表示する自動生成テキスト（実績から都度計算）
   const autoHeadline = useMemo(
@@ -361,7 +370,6 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
           alt="Neighbor Engineers"
           className="w-44 h-auto mb-10"
         />
-        <p className="text-xs font-bold tracking-[0.3em] text-slate-400 mb-4">SSP（SES）REPORT</p>
         <h1 className="text-3xl font-extrabold text-slate-900 mb-3">{formatClientName(data.clientName)}</h1>
         <p className="text-base text-slate-500 mb-12">SSP（SES）レポート</p>
         <div className="text-sm text-slate-500 space-y-2">
@@ -800,6 +808,7 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 <tr>
                   <th className="p-4 text-left">要員ID</th>
                   <th className="p-4 text-left">氏名</th>
+                  <th className="p-4 text-left">営業期間</th>
                   <th className="p-4 text-right">提案単価</th>
                   <th className="p-4 text-right">オファー単価</th>
                   <th className="p-4 text-right">支援費</th>
@@ -828,6 +837,37 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                         />
                       ) : (
                         m.name
+                      )}
+                    </td>
+                    {/* 営業期間。案件延長などで途中終了した要員は提案数が必ず少なくなるため、
+                        提案数の妥当性を読み手が判断できるよう日数を明示する。 */}
+                    <td className="p-4 text-left text-xs text-slate-500">
+                      {isEditing ? (
+                        <div className="flex flex-col gap-1">
+                          <input
+                            type="date"
+                            aria-label="営業開始日"
+                            className="w-36 rounded border border-slate-200 px-2 py-1"
+                            value={m.salesStartDate ?? ''}
+                            onChange={(e) =>
+                              updateMember(m.id, { salesStartDate: e.target.value || undefined })
+                            }
+                          />
+                          <input
+                            type="date"
+                            aria-label="営業終了日（空欄なら期間末まで継続）"
+                            className="w-36 rounded border border-slate-200 px-2 py-1"
+                            value={m.salesEndDate ?? ''}
+                            onChange={(e) => updateMember(m.id, { salesEndDate: e.target.value || undefined })}
+                          />
+                        </div>
+                      ) : m.salesPeriod ? (
+                        <>
+                          <span className="whitespace-nowrap">{m.salesPeriod.label}</span>
+                          <span className="block text-slate-400 tabular-nums">{m.salesPeriod.days}日間</span>
+                        </>
+                      ) : (
+                        '－'
                       )}
                     </td>
                     <td className="p-4 text-right text-slate-500">
@@ -1077,6 +1117,14 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                   <span>
                     オファー <b className="tabular-nums">{m.offers}</b>件
                   </span>
+                  {/* 営業期間。提案数の絶対値だけでは妥当性が判断できないため、
+                      印刷レイアウトでも実績のすぐ隣に日数を出す。 */}
+                  {m.salesPeriod && (
+                    <span className="text-slate-400">
+                      営業 {m.salesPeriod.label}
+                      <b className="tabular-nums">（{m.salesPeriod.days}日）</b>
+                    </span>
+                  )}
                   {m.closeReason && <span className="ml-auto text-slate-400">営業終了理由：{m.closeReason}</span>}
                 </div>
 

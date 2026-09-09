@@ -6,6 +6,8 @@
 // しきい値は事業判断で調整可能な値なので、定数として上部にまとめている。
 
 import type { Diagnosis, MemberData } from './types';
+import type { ReportPeriodRange, SalesPeriodInfo } from './salesPeriod';
+import { formatPace, getSalesPeriodInfo, monthlyProposalPace } from './salesPeriod';
 
 /** 提案数がこの件数未満の場合は、統計的に判断材料が不足しているとみなす */
 export const MIN_SAMPLE_PROPOSALS = 3;
@@ -43,6 +45,12 @@ export const MIN_SAMPLE_INTERVIEWS = 3;
 export interface DiagnosisContext {
   /** チーム全体の面談移行率（面談数合計 ÷ 提案数合計）。個別診断の相対評価の基準値として使う */
   teamInterviewRate: number;
+  /**
+   * レポート期間（「2026/08/01〜2026/08/31」等の自由入力）から推定した開始日・終了日。
+   * 要員の営業開始日／終了日と突き合わせ、「通期で営業できたのか、途中で終了したのか」を判定する。
+   * 読み取れない場合はstart/endともnullでよい（その場合は営業日数だけで判断する）。
+   */
+  reportPeriod?: ReportPeriodRange;
 }
 
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
@@ -75,6 +83,13 @@ export const DIAGNOSIS_LABELS = {
   interviewRateSlightlyLow: '面談移行にやや課題',
   /** 面談は平均以上に取れているがオファー0件 */
   offerConversionIssue: 'オファー転換に課題',
+  /**
+   * 案件延長などで対象期間の途中で営業を終了した／途中から開始したため、
+   * 提案数の絶対値では評価できないケース。
+   * 「提案機会なし／限定的」と分類してしまうと、実際は期間が短かっただけなのに
+   * 案件確保の問題として読まれてしまうため、専用のラベルを分けている。
+   */
+  shortSalesPeriod: '営業期間が短期',
 } as const;
 
 /**
@@ -100,13 +115,83 @@ function appendCloseReason(comment: string, m: MemberData): string {
   return `${comment}（終了理由：${reason}）`;
 }
 
+/**
+ * 営業期間の注記をコメント末尾に付ける。
+ * 通期（レポート期間の頭から末まで）営業できていた要員には付けない。
+ * 途中開始・途中終了の要員だけに付けることで、「提案数が少ないのは期間が短いからだ」という
+ * 前提を読み手が判断できるようにする。
+ */
+function appendSalesPeriod(comment: string, sp: SalesPeriodInfo | null, proposals: number): string {
+  if (!sp || !sp.isPartial) return comment;
+  const pace = monthlyProposalPace(proposals, sp.days);
+  const paceNote = proposals > 0 ? `・月換算${formatPace(pace)}社ペース` : '';
+  return `${comment}（営業期間：${sp.label}の${sp.days}日間${paceNote}）`;
+}
+
 export function diagnoseMember(m: MemberData, context: DiagnosisContext): Diagnosis {
-  const finalize = (d: Diagnosis): Diagnosis => ({
+  const salesPeriod = getSalesPeriodInfo(m, context.reportPeriod);
+
+  // withPeriodNote=false は、コメント本文ですでに営業期間に言及している診断（営業期間が短期）用。
+  // 二重に「（営業期間：…）」が付くのを防ぐ。
+  const finalize = (d: Diagnosis, withPeriodNote = true): Diagnosis => ({
     ...d,
-    comment: appendCloseReason(d.comment, m),
+    comment: withPeriodNote
+      ? appendSalesPeriod(appendCloseReason(d.comment, m), salesPeriod, m.proposals)
+      : appendCloseReason(d.comment, m),
   });
 
-  // 提案が0件・少数のケースは、要員の能力ではなく「提案できる案件の母数」の問題として扱う。
+  const interviewRate = m.proposals > 0 ? m.interviews / m.proposals : 0;
+  const offerRate = m.interviews > 0 ? m.offers / m.interviews : 0;
+  const teamRate = context.teamInterviewRate;
+
+  // 1. オファーが1件でもあれば、その時点で営業活動は完了（成約）とみなし最優先の高評価とする。
+  //    提案数の多寡・営業期間の長短に関わらず、この判定を最初に行う
+  //    （提案2社でオファー1件の要員が「提案機会が限定的」に分類されてしまうのを防ぐため）。
+  //    オファーからの転換率の高低は、営業終了後の指標のため評価には使わない。
+  //    ただし書類段階（面談移行率）が強かったのか、面談で挽回したのかは読み手にとって重要なため、
+  //    能力を断定するラベルではなく事実のみのラベルとし、水準はコメントで示す。
+  if (m.offers > 0) {
+    // 面談を経ずにオファーへ至ったケース（書類のみで決まった等）は転換率を出しても意味がないため文面を分ける
+    const funnelNote =
+      m.interviews > 0
+        ? `提案${m.proposals}社・面談${m.interviews}社・オファー${m.offers}社（オファー転換率${pct(offerRate)}）で営業活動は完了。`
+        : `提案${m.proposals}社・オファー${m.offers}社で営業活動は完了（面談の記録なし）。`;
+    const stageNote =
+      m.interviews === 0
+        ? ''
+        : teamRate > 0 && interviewRate < teamRate
+          ? `面談移行率は${pct(interviewRate)}（チーム平均${pct(teamRate)}）と平均を下回るものの、面談からは着実にオファーへ繋げている。書類段階の訴求を強化できれば、さらに母数を増やせる。`
+          : `面談移行率${pct(interviewRate)}（チーム平均${pct(teamRate)}）と書類段階から順調に進み、オファー獲得に至っている。`;
+    return finalize({
+      tone: 'success',
+      label: DIAGNOSIS_LABELS.offerWon,
+      comment: `${funnelNote}${stageNote}`,
+    });
+  }
+
+  // 2. 営業期間そのものが短いケース。
+  //    案件延長などで対象期間の途中で営業を終了した要員は、提案数の絶対値で見ると必ず少なくなる。
+  //    「営業日数が2週間未満」または「月換算のペースでは評価に足る提案ができている」場合は、
+  //    案件の母数の問題ではなく期間の問題として切り分ける（オファー獲得済みの要員は上で成功として返している）。
+  if (salesPeriod && m.proposals < MIN_SAMPLE_PROPOSALS) {
+    const pace = monthlyProposalPace(m.proposals, salesPeriod.days);
+    const paceIsAdequate = pace >= MIN_SAMPLE_PROPOSALS;
+    if (salesPeriod.isShort || paceIsAdequate) {
+      const body = paceIsAdequate
+        ? `営業期間は${salesPeriod.days}日間（${salesPeriod.label}）で提案${m.proposals}社。月換算では${formatPace(pace)}社ペースにあたり、提案数の少なさは営業期間の短さによるもの。`
+        : `営業期間が${salesPeriod.days}日間（${salesPeriod.label}）と短く、提案${m.proposals}社。提案先の選定から提出までが一巡しておらず、提案数の多寡で評価できる状態にない。`;
+      return finalize(
+        {
+          tone: 'neutral',
+          label: DIAGNOSIS_LABELS.shortSalesPeriod,
+          comment: appendProposalReason(body, m),
+        },
+        false
+      );
+    }
+  }
+
+  // 3. 提案が0件・少数のケースは、要員の能力ではなく「提案できる案件の母数」の問題として扱う。
   if (m.proposals === 0) {
     return finalize({
       tone: 'neutral',
@@ -129,27 +214,7 @@ export function diagnoseMember(m: MemberData, context: DiagnosisContext): Diagno
     });
   }
 
-  const interviewRate = m.interviews / m.proposals;
-  const offerRate = m.interviews > 0 ? m.offers / m.interviews : 0;
-  const teamRate = context.teamInterviewRate;
-
-  // 1. オファーが1件でもあれば、その時点で営業活動は完了（成約）とみなし最優先の高評価とする。
-  //    オファーからの転換率の高低は、営業終了後の指標のため評価には使わない。
-  //    ただし書類段階（面談移行率）が強かったのか、面談で挽回したのかは読み手にとって重要なため、
-  //    能力を断定するラベルではなく事実のみのラベルとし、水準はコメントで示す。
-  if (m.offers > 0) {
-    const stageNote =
-      teamRate > 0 && interviewRate < teamRate
-        ? `面談移行率は${pct(interviewRate)}（チーム平均${pct(teamRate)}）と平均を下回るものの、面談からは着実にオファーへ繋げている。書類段階の訴求を強化できれば、さらに母数を増やせる。`
-        : `面談移行率${pct(interviewRate)}（チーム平均${pct(teamRate)}）と書類段階から順調に進み、オファー獲得に至っている。`;
-    return finalize({
-      tone: 'success',
-      label: DIAGNOSIS_LABELS.offerWon,
-      comment: `提案${m.proposals}社・面談${m.interviews}社・オファー${m.offers}社（オファー転換率${pct(offerRate)}）で営業活動は完了。${stageNote}`,
-    });
-  }
-
-  // 2. 面談が1件も獲得できていない → 書類（スキルシート）段階で止まっているケース
+  // 4. 面談が1件も獲得できていない → 書類（スキルシート）段階で止まっているケース
   if (m.interviews === 0) {
     return finalize({
       tone: 'warning',
@@ -158,7 +223,7 @@ export function diagnoseMember(m: MemberData, context: DiagnosisContext): Diagno
     });
   }
 
-  // 3. ここから先は面談移行率の評価。チーム平均との相対評価を基本としつつ、
+  // 5. ここから先は面談移行率の評価。チーム平均との相対評価を基本としつつ、
   //    絶対水準の下限（INTERVIEW_RATE_ABSOLUTE_FLOOR）も併せて見る。
   //    相対評価のみだと、チーム全体が低調な月に「平均は上回るが実際は10%」という要員へ
   //    「書類段階は通過できている」という事実と食い違う診断が出てしまうため。
@@ -192,7 +257,7 @@ export function diagnoseMember(m: MemberData, context: DiagnosisContext): Diagno
     });
   }
 
-  // 4. 書類段階は絶対水準・チーム平均の双方をクリアしているがオファーが1件もない
+  // 6. 書類段階は絶対水準・チーム平均の双方をクリアしているがオファーが1件もない
   //    → 課題は面談〜選考の段階にあると判断できる
   const sampleNote =
     m.interviews < MIN_SAMPLE_INTERVIEWS
@@ -307,6 +372,8 @@ export const ACTION_RECOMMENDATIONS: Record<string, string> = {
     '提案可能な案件の拡大：条件に合致する案件が限定的なため、想定単価・稼働条件・対応領域・対象エリアの緩和余地を協議し、提案先の母数を増やす。',
   [DIAGNOSIS_LABELS.noOpportunity]:
     '提案可能な案件の確保：条件に合致する案件が確保できていないため、想定単価・稼働条件・対応領域の見直しを協議し、まず提案対象となる案件を確保する。',
+  [DIAGNOSIS_LABELS.shortSalesPeriod]:
+    '営業期間を揃えた評価と着手の前倒し：案件延長等により対象期間中の営業日数が短いため、提案数の絶対値ではなく月換算ペースで評価する。次回は稼働終了予定日から逆算して営業開始日を前倒しし、通期での提案数を確保する。',
 };
 
 /** 診断ラベル1件分の推奨アクション文を返す（要員別詳細データの「今後の対策」列で使う） */

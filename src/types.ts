@@ -1,6 +1,8 @@
 // types.ts
 // アプリ全体で共有する型定義。UIコンポーネント側で同じinterfaceを再定義しないこと。
 
+import type { SalesPeriodInfo } from './salesPeriod';
+
 export interface MemberData {
   id: string;
   name: string;          // 例: "要員A"
@@ -14,6 +16,13 @@ export interface MemberData {
   proposalUnitPrice?: number;
   supportFee: number;    // 支援費（要員1名あたりの月額想定コスト。実質粗利の算出に使用）
   closeReason?: string;  // 営業終了理由（オファーに至らず終了した場合の理由。任意項目）
+  // 営業開始日／営業終了日（"YYYY-MM-DD"。任意項目）。
+  // 案件延長などで対象期間の途中で営業を終了したケースでは、提案数の絶対値だけを見ると
+  // 「提案が足りない」と誤読されてしまう。実際に営業していた日数を持たせることで、
+  // 診断・今後の対策を「月換算の提案ペース」で評価できるようにする。
+  // 終了日が空の場合は、レポート期間の末日（読み取れない場合は当日）まで営業継続とみなす。
+  salesStartDate?: string;
+  salesEndDate?: string;
   // 提案が伸びない要因（提案数が0件〜少数の場合に、その理由を明記するための任意項目）。
   // 例: 「想定単価に見合う案件が市場に少ない」「稼働開始が期末のため対象案件が限られた」。
   // 未入力でも診断は成立するが、記載があると読み手に営業活動の稼働不足と誤解されにくくなる。
@@ -53,6 +62,8 @@ export interface Diagnosis {
 
 // 要員ごとの計算結果 (MemberDataに計算値を付加した型)
 export interface MemberCalculation extends MemberData {
+  // 営業開始日から求めた営業期間（開始日未入力の要員はnull）。表示と診断の両方で使う。
+  salesPeriod: SalesPeriodInfo | null;
   returnRate: number;   // % (選択された還元率)
   baseCost: number;     // 還元社原価
   grossProfit: number;  // 実質粗利額 (= 売上単価 - 還元額 - 支援費)

@@ -11,11 +11,13 @@
 //   面談数 |    |     1 |     1 |     3 | ...
 //
 // 面談移行率・オファー獲得率の行は自前で計算し直すため読み飛ばす。
-// 「営業終了理由」「支援費」「提案が伸びない要因」の行がある場合は任意項目として読み込む
-// （無くてもエラーにはならない。支援費は未指定なら0）。
+// 「営業終了理由」「支援費」「提案が伸びない要因」「営業開始日」「営業終了日」の行がある場合は
+// 任意項目として読み込む（無くてもエラーにはならない。支援費は未指定なら0）。
+// 営業開始日・終了日はExcelの日付セル（シリアル値）でも文字列でも読める。
 
 import type { MemberData } from './types';
 import type { CsvImportResult, ImportRow } from './csv';
+import { normalizeDateInput } from './salesPeriod';
 
 function cellToString(cell: unknown): string {
   return cell === null || cell === undefined ? '' : String(cell).trim();
@@ -34,6 +36,21 @@ export function looksLikeSspTemplate(rows: ImportRow[]): boolean {
 
 type NumericMetricKey = 'proposals' | 'interviews' | 'offers' | 'unitPrice' | 'proposalUnitPrice' | 'supportFee';
 type StringMetricKey = 'closeReason' | 'proposalReason';
+type DateMetricKey = 'salesStartDate' | 'salesEndDate';
+
+/**
+ * 「営業開始日」「営業終了日」の行。
+ * 数値・文字列のどちらの判定よりも先に評価する（「営業終了日」が「終了理由」判定に、
+ * また日付のシリアル値が数値項目に吸われないようにするため）。
+ */
+function matchDateMetricKey(label: string): DateMetricKey | null {
+  // 「稼働開始日」（案件の稼働開始）と誤認しないよう、「営業」が付くか単独の「開始日／終了日」だけを拾う
+  if (/営業/.test(label) || /^(開始日|終了日)$/.test(label)) {
+    if (label.includes('開始日')) return 'salesStartDate';
+    if (label.includes('終了日')) return 'salesEndDate';
+  }
+  return null;
+}
 
 function matchNumericMetricKey(label: string): NumericMetricKey | null {
   if (label.includes('提案数')) return 'proposals';
@@ -111,11 +128,24 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
     closeReason: {},
     proposalReason: {},
   };
+  const dateValues: Record<DateMetricKey, Record<number, string>> = {
+    salesStartDate: {},
+    salesEndDate: {},
+  };
 
   for (let r = nameRowIndex + 1; r < rows.length; r++) {
     const row = rows[r];
     const label = cellToString(row[0]);
     if (!label) continue;
+
+    const dateKey = matchDateMetricKey(label);
+    if (dateKey) {
+      for (const { colIndex } of memberColumns) {
+        const iso = normalizeDateInput(row[colIndex]);
+        if (iso) dateValues[dateKey][colIndex] = iso;
+      }
+      continue;
+    }
 
     const numericKey = matchNumericMetricKey(label);
     if (numericKey) {
@@ -139,6 +169,8 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
     const closeReason = stringValues.closeReason[colIndex];
     const proposalReason = stringValues.proposalReason[colIndex];
     const proposalUnitPrice = values.proposalUnitPrice[colIndex];
+    const salesStartDate = dateValues.salesStartDate[colIndex];
+    const salesEndDate = dateValues.salesEndDate[colIndex];
     return {
       id: `${Date.now()}-${idx}`,
       name,
@@ -150,6 +182,8 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
       ...(closeReason !== undefined ? { closeReason } : {}),
       ...(proposalReason !== undefined ? { proposalReason } : {}),
       ...(proposalUnitPrice !== undefined ? { proposalUnitPrice } : {}),
+      ...(salesStartDate !== undefined ? { salesStartDate } : {}),
+      ...(salesEndDate !== undefined ? { salesEndDate } : {}),
     };
   });
 

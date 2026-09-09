@@ -22,7 +22,21 @@ export const sampleReportData: ReportSummaryData = {
       supportFee: 30000,
       proposalReason: '想定単価に見合う案件が市場に少なく、提案先が限られた',
     },
-    { id: '2', name: '要員B', proposals: 0, interviews: 0, offers: 0, unitPrice: 0, proposalUnitPrice: 500000, supportFee: 30000 },
+    {
+      // 案件延長で対象期間の途中に営業を終了したケース。
+      // 提案0件だが営業日数が10日間のため、「提案機会なし」ではなく「営業期間が短期」と診断される。
+      id: '2',
+      name: '要員B',
+      proposals: 0,
+      interviews: 0,
+      offers: 0,
+      unitPrice: 0,
+      proposalUnitPrice: 500000,
+      supportFee: 30000,
+      salesStartDate: '2026-08-01',
+      salesEndDate: '2026-08-10',
+      closeReason: '現案件の延長が決まり営業終了',
+    },
     {
       id: '3',
       name: '要員C',
@@ -43,6 +57,9 @@ export const sampleReportData: ReportSummaryData = {
       proposalUnitPrice: 500000,
       supportFee: 30000,
       closeReason: '条件不一致',
+      // 通期より短い営業期間だが提案数は足りているケース。診断コメントに営業期間が注記される。
+      salesStartDate: '2026-08-01',
+      salesEndDate: '2026-08-20',
     },
     {
       id: '5',
