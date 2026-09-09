@@ -109,6 +109,12 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     const totalProposals = data.members.reduce((sum, m) => sum + m.proposals, 0);
     const totalSupportFee = data.members.reduce((sum, m) => sum + m.supportFee, 0);
 
+    // オファーを獲得した要員数。平均単価はこの人数を母数にする。
+    // 稼働要員数（＝営業した全員）で割ると、オファーが出ていない要員の分だけ薄まり、
+    // 実際に獲得できた単価の水準より大幅に低い金額が出てしまうため。
+    const offerMemberCount = data.members.filter((m) => m.offers > 0).length;
+    const averageWonUnitPrice = offerMemberCount > 0 ? Math.round(totalUnitPrices / offerMemberCount) : 0;
+
     // 実質粗利・費用対効果シミュレーション (60%, 70%, 80% 還元の3パターン比較)
     // 実質粗利 = 売上単価の合計 × (1 - 還元率) - 支援費の合計
     // 費用対効果 = 実質粗利 ÷ 固定費用基準額（35万円換算）× 100
@@ -183,6 +189,8 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
       totalInterviews,
       totalProposals,
       totalSupportFee,
+      offerMemberCount,
+      averageWonUnitPrice,
       profitData,
       memberCalculations,
       diagnosisGroups,
@@ -593,21 +601,28 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
                 {formatCurrency(calculatedData.totalUnitPrices)}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="p-4 bg-white rounded-xl border border-slate-200 text-center">
+            <div className="grid grid-cols-3 gap-3 print:gap-2">
+              <div className="p-4 print:p-3 bg-white rounded-xl border border-slate-200 text-center">
                 <p className="text-xs text-slate-500">稼働要員数</p>
                 <p className="font-display text-2xl font-extrabold mt-1.5 tabular-nums">
                   {data.members.length}
                   <span className="text-xs font-semibold text-slate-500 ml-0.5">名</span>
                 </p>
               </div>
-              <div className="p-4 bg-white rounded-xl border border-slate-200 text-center">
-                <p className="text-xs text-slate-500">要員平均単価</p>
+              {/* オファー人数。平均単価の母数がこの人数であることを読み手に示すため、隣に並べる */}
+              <div className="p-4 print:p-3 bg-white rounded-xl border border-slate-200 text-center">
+                <p className="text-xs text-slate-500">オファー人数</p>
                 <p className="font-display text-2xl font-extrabold mt-1.5 tabular-nums">
-                  {formatCurrency(
-                    data.members.length > 0 ? Math.round(calculatedData.totalUnitPrices / data.members.length) : 0
-                  )}
+                  {calculatedData.offerMemberCount}
+                  <span className="text-xs font-semibold text-slate-500 ml-0.5">名</span>
                 </p>
+              </div>
+              <div className="p-4 print:p-3 bg-white rounded-xl border border-slate-200 text-center">
+                <p className="text-xs text-slate-500">要員平均単価</p>
+                <p className="font-display text-xl font-extrabold mt-1.5 tabular-nums break-all">
+                  {formatCurrency(calculatedData.averageWonUnitPrice)}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">オファー獲得者の平均</p>
               </div>
             </div>
             <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100 text-center">
