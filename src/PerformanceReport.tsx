@@ -209,11 +209,26 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
   );
   const displayedHeadline = data.headline.trim() ? data.headline : autoHeadline;
 
-  // 「今後の対策」の自動生成テキスト（編集用テキストエリアのプレースホルダー・リセット先として使用）
-  const autoActionPlanText = calculatedData.actionPlan.join('\n');
+  // 「今後の対策」は actionPlanText に「1項目＝1行」で保持している。
+  // 表示側は空行を除外するが、編集側は空行もそのまま項目として扱う
+  // （入力途中で本文を消した行が画面から消えてしまわないようにするため）。
   const displayedActionPlanItems = data.actionPlanText?.trim()
     ? data.actionPlanText.split('\n').map((s) => s.trim()).filter(Boolean)
     : calculatedData.actionPlan;
+  const actionPlanEditItems = data.actionPlanText ? data.actionPlanText.split('\n') : calculatedData.actionPlan;
+
+  // 項目単位の編集（1つの巨大なテキストエリアだと、どこが1項目なのか分からず編集しづらいため）。
+  // 全項目が空になった場合は自動生成に戻す。
+  const writeActionPlanItems = (items: string[]) => {
+    // 1項目1行で保持するため、テキストエリア内で改行されても行が分裂しないよう空白に置き換える
+    const normalized = items.map((s) => s.replace(/\r?\n/g, ' '));
+    updateHeaderField({ actionPlanText: normalized.some((s) => s.trim()) ? normalized.join('\n') : '' });
+  };
+  const updateActionPlanItem = (index: number, value: string) =>
+    writeActionPlanItems(actionPlanEditItems.map((s, i) => (i === index ? value : s)));
+  const removeActionPlanItem = (index: number) =>
+    writeActionPlanItems(actionPlanEditItems.filter((_, i) => i !== index));
+  const addActionPlanItem = () => writeActionPlanItems([...actionPlanEditItems, '']);
 
   // 「全体診断（コピペ用）」の自動生成テキスト。要員別診断カードと内容が重複しないよう、
   // 個々のコメントを列挙するのではなく、実績サマリー・診断内訳・今後の対策に絞った総括文にしている。
@@ -730,23 +745,48 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
               </div>
               <div className="space-y-2">
                 {isEditing ? (
-                  <>
-                    <textarea
-                      className="block w-full rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 text-xs leading-relaxed text-slate-900"
-                      rows={6}
-                      value={data.actionPlanText?.trim() ? data.actionPlanText : autoActionPlanText}
-                      onChange={(e) => updateHeaderField({ actionPlanText: e.target.value })}
-                    />
-                    {data.actionPlanText?.trim() && (
+                  <div className="space-y-2">
+                    {/* 1項目ごとにテキストエリアを分ける。番号は表示側と同じ順序で振られる。 */}
+                    {actionPlanEditItems.map((action, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <span className="shrink-0 mt-1.5 w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <textarea
+                          className="flex-1 min-w-0 rounded-lg border border-indigo-200 bg-indigo-50/40 p-2 text-xs leading-relaxed text-slate-900"
+                          rows={3}
+                          placeholder="対策を入力"
+                          value={action}
+                          onChange={(e) => updateActionPlanItem(idx, e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeActionPlanItem(idx)}
+                          className="shrink-0 mt-1.5 text-xs font-semibold text-red-500 hover:text-red-700"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-4 pl-8">
                       <button
                         type="button"
-                        onClick={() => updateHeaderField({ actionPlanText: '' })}
-                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline print:hidden"
+                        onClick={addActionPlanItem}
+                        className="text-xs font-semibold text-slate-600 hover:text-slate-900"
                       >
-                        自動生成に戻す
+                        ＋ 対策を追加
                       </button>
-                    )}
-                  </>
+                      {data.actionPlanText?.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => updateHeaderField({ actionPlanText: '' })}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline print:hidden"
+                        >
+                          自動生成に戻す
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {displayedActionPlanItems.map((action, idx) => (
