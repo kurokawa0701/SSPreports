@@ -38,7 +38,7 @@ function endOfMonth(year: number, month1to12: number): Date {
  * ExcelはXLSX.read(raw:true)だと日付セルをシリアル値（1899-12-30起点の連番）で返すため、
  * 数値の場合はシリアル値として変換する。
  */
-export function normalizeDateInput(value: unknown): string | undefined {
+export function normalizeDateInput(value: unknown, reportPeriod?: ReportPeriodRange): string | undefined {
   if (value === null || value === undefined || value === '') return undefined;
 
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -53,15 +53,54 @@ export function normalizeDateInput(value: unknown): string | undefined {
     return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
   }
 
-  const text = String(value).trim();
+  // 「8月17日～」「8/17〜」のように継続を表す記号が付くことがあるため、末尾の波ダッシュ・ハイフンは落とす。
+  // 「未営業」「-」など日付でない記述はundefinedになり、営業期間なしとして扱われる。
+  const text = String(value).trim().replace(/[~〜～\-–—]+$/, '').trim();
   if (!text) return undefined;
 
   // "2026-08-01" / "2026/8/1" / "2026年8月1日" のいずれにも対応する
-  const m = text.match(/(\d{4})\s*[-/年.]\s*(\d{1,2})\s*[-/月.]\s*(\d{1,2})/);
-  if (m) return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`;
+  const withYear = text.match(/(\d{4})\s*[-/年.]\s*(\d{1,2})\s*[-/月.]\s*(\d{1,2})/);
+  if (withYear) return `${withYear[1]}-${pad(Number(withYear[2]))}-${pad(Number(withYear[3]))}`;
+
+  // 年を省略した「8月17日」「8/17」。実運用ではこの書き方が多いため、
+  // レポート期間から年を補う（期間が年をまたぐ場合は、期間内に収まる年を選ぶ）。
+  const monthDay = text.match(/^(\d{1,2})\s*[-/月.]\s*(\d{1,2})\s*日?$/);
+  if (monthDay) {
+    const month = Number(monthDay[1]);
+    const day = Number(monthDay[2]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const year = inferYear(month, day, reportPeriod);
+      if (year !== null) return `${year}-${pad(month)}-${pad(day)}`;
+    }
+    return undefined;
+  }
 
   const parsed = new Date(text);
   return Number.isNaN(parsed.getTime()) ? undefined : toIsoDate(parsed);
+}
+
+/**
+ * 年が省略された月日に対して、レポート期間から年を推定する。
+ * 期間が読み取れない場合は推定できないためnull（＝営業期間なしとして扱う）を返す。
+ * 誤った年を当てて日数を大きく間違えるより、期間なしとして扱うほうが安全なため。
+ */
+function inferYear(month: number, day: number, reportPeriod?: ReportPeriodRange): number | null {
+  const start = reportPeriod?.start ?? null;
+  const end = reportPeriod?.end ?? null;
+  const anchor = start ?? end;
+  if (!anchor) return null;
+
+  // レポート期間内に収まる年を優先する（12月〜1月をまたぐ期間でも正しい年が選べる）
+  const candidates = start && end && start.getFullYear() !== end.getFullYear()
+    ? [start.getFullYear(), end.getFullYear()]
+    : [anchor.getFullYear()];
+  for (const y of candidates) {
+    const d = new Date(y, month - 1, day);
+    if ((!start || d.getTime() >= start.getTime()) && (!end || d.getTime() <= end.getTime())) return y;
+  }
+  // 期間より前から営業していたケース（例：期間8/17〜だが営業開始は8/1）は期間内に収まらないので、
+  // 期間の年をそのまま使う。
+  return anchor.getFullYear();
 }
 
 function pad(n: number): string {

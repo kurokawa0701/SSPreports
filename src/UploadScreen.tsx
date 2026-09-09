@@ -42,21 +42,32 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onLoad }) => {
     onLoad(buildReportFromImport(result), true);
   };
 
+  // 例外を握りつぶすと「ファイルを選んでも画面が何も変わらない」状態になり、
+  // 原因が全く分からなくなるため、必ずエラー表示に変換する。
   const processFile = async (file: File) => {
     setErrors([]);
-    const prepared = await prepareImport(file);
-    if (prepared.kind === 'excel-multi') {
-      setPendingSheets(prepared);
-      return;
+    try {
+      const prepared = await prepareImport(file);
+      if (prepared.kind === 'excel-multi') {
+        setPendingSheets(prepared);
+        return;
+      }
+      finalizeResult(await readMembers(prepared));
+    } catch (e) {
+      setErrors([`ファイルの読み込み中にエラーが発生しました：${e instanceof Error ? e.message : String(e)}`]);
     }
-    finalizeResult(await readMembers(prepared));
   };
 
   const handleSelectSheet = async (sheetName: string) => {
     if (!pendingSheets) return;
-    const result = await readMembers(pendingSheets, sheetName);
-    setPendingSheets(null);
-    finalizeResult(result);
+    try {
+      const result = await readMembers(pendingSheets, sheetName);
+      setPendingSheets(null);
+      finalizeResult(result);
+    } catch (e) {
+      setPendingSheets(null);
+      setErrors([`シート「${sheetName}」の読み込み中にエラーが発生しました：${e instanceof Error ? e.message : String(e)}`]);
+    }
   };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {

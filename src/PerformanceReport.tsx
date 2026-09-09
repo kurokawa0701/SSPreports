@@ -295,21 +295,32 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     }
   };
 
+  // 例外を握りつぶすと「読み込んでも数字が変わらない」状態になり原因が追えないため、
+  // 必ずエラー表示に変換する。
   const processImportFile = async (file: File) => {
     setImportErrors([]);
-    const prepared = await prepareImport(file);
-    if (prepared.kind === 'excel-multi') {
-      setPendingSheets(prepared);
-      return;
+    try {
+      const prepared = await prepareImport(file);
+      if (prepared.kind === 'excel-multi') {
+        setPendingSheets(prepared);
+        return;
+      }
+      applyImportResult(await readMembers(prepared));
+    } catch (e) {
+      setImportErrors([`ファイルの読み込み中にエラーが発生しました：${e instanceof Error ? e.message : String(e)}`]);
     }
-    applyImportResult(await readMembers(prepared));
   };
 
   const handleSelectSheet = async (sheetName: string) => {
     if (!pendingSheets) return;
-    const result = await readMembers(pendingSheets, sheetName);
-    setPendingSheets(null);
-    applyImportResult(result);
+    try {
+      const result = await readMembers(pendingSheets, sheetName);
+      setPendingSheets(null);
+      applyImportResult(result);
+    } catch (e) {
+      setPendingSheets(null);
+      setImportErrors([`シート「${sheetName}」の読み込み中にエラーが発生しました：${e instanceof Error ? e.message : String(e)}`]);
+    }
   };
 
   const handleCsvChange = (e: ChangeEvent<HTMLInputElement>) => {

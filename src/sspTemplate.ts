@@ -17,7 +17,7 @@
 
 import type { MemberData } from './types';
 import type { CsvImportResult, ImportRow } from './csv';
-import { normalizeDateInput } from './salesPeriod';
+import { normalizeDateInput, parseReportPeriod } from './salesPeriod';
 
 function cellToString(cell: unknown): string {
   return cell === null || cell === undefined ? '' : String(cell).trim();
@@ -92,6 +92,9 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
     }
   }
 
+  // 年を省略した営業開始日／終了日の年を補うために、レポート期間を先に解析しておく
+  const reportPeriod = parseReportPeriod(period);
+
   // 「要員別」ラベルの行のうち、C列以降に要員名（数値に変換できない文字列）が並ぶ行を探す
   const nameRowIndex = rows.findIndex((row) => {
     if (cellToString(row[0]) !== '要員別') return false;
@@ -141,7 +144,8 @@ export function parseSspTemplate(rows: ImportRow[]): CsvImportResult {
     const dateKey = matchDateMetricKey(label);
     if (dateKey) {
       for (const { colIndex } of memberColumns) {
-        const iso = normalizeDateInput(row[colIndex]);
+        // 「8月17日～」のように年を省略した書き方が多いため、レポート期間から年を補う
+        const iso = normalizeDateInput(row[colIndex], reportPeriod);
         if (iso) dateValues[dateKey][colIndex] = iso;
       }
       continue;
